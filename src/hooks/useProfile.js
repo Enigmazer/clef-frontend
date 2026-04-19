@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMe, togglePhoneVisibility, toggleStudentSectionVisibility, toggleTeacherSectionVisibility } from '../api/users'
+import { getMe, togglePhoneVisibility, toggleStudentSectionVisibility, toggleTeacherSectionVisibility, uploadAvatar, deleteAvatar } from '../api/users'
 import { getPhones, sendOtp as sendPhoneOtp, verifyOtp as verifyPhoneOtp, deletePhone, setPrimaryPhone } from '../api/phone'
 import { password, send2FAOtp, enable2FA, disable2FA } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
@@ -25,13 +25,13 @@ export function usePhonesQuery() {
 
 export function useProfileMutations() {
   const queryClient = useQueryClient()
-  const { setUser } = useAuth()
+  const { refreshUser } = useAuth()
 
   const invalidateUser = async () => {
     await queryClient.invalidateQueries({ queryKey: ['user', 'me'] })
     try {
       const freshUser = await queryClient.fetchQuery({ queryKey: ['user', 'me'], queryFn: getMe })
-      setUser(freshUser)
+      refreshUser(freshUser)
     } catch {
       // silently fail if user is unauthenticated
     }
@@ -92,6 +92,16 @@ export function useProfileMutations() {
 
     disable2fa: useMutation({
       mutationFn: ({ otpCode }) => disable2FA(otpCode),
+      onSuccess: invalidateUser,
+    }),
+
+    uploadAvatar: useMutation({
+      mutationFn: uploadAvatar,
+      onSuccess: invalidateUser,
+    }),
+
+    deleteAvatar: useMutation({
+      mutationFn: deleteAvatar,
       onSuccess: invalidateUser,
     }),
   }

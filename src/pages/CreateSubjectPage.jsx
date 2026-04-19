@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import Navbar from '../components/Navbar'
-import { useCreateSubject } from '../hooks/useCreateSubject'
+import { useCreateSubject } from '../hooks/useSubjects'
 
 export default function CreateSubjectPage() {
   const navigate = useNavigate()

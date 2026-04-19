@@ -95,7 +95,7 @@ const features = [
 
 export default function LandingPage() {
   const navigate = useNavigate()
-  const { isLoading, isAuthenticated, setUser } = useAuth()
+  const { isLoading, isAuthenticated, refreshUser } = useAuth()
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -111,12 +111,12 @@ export default function LandingPage() {
       .then(() => getMe())
       .then((user) => {
         if (user) {
-          setUser(user)
+          refreshUser(user)
           navigate('/dashboard', { replace: true })
         }
       })
       .catch(() => { })
-  }, [isLoading, isAuthenticated, navigate, setUser])
+  }, [isLoading, isAuthenticated, navigate, refreshUser])
 
   const handleGetStarted = () => navigate('/login')
   const handleSeeHow = (e) => {
@@ -322,28 +322,41 @@ export default function LandingPage() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="py-24 px-6 bg-green-500 dark:bg-green-600 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.15),_transparent)] pointer-events-none" />
-        <div className="relative max-w-2xl mx-auto text-center">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-4">
-            Ready to sync your class?
+      <section className="py-24 px-6 bg-green-600 dark:bg-green-600 relative overflow-hidden">
+
+        {/* Floating Educational Emojis */}
+        <div className="absolute top-10 left-[10%] text-6xl opacity-10 transform -rotate-12 select-none pointer-events-none">📚</div>
+        <div className="absolute bottom-10 left-[25%] text-5xl opacity-10 transform rotate-12 select-none pointer-events-none">🎓</div>
+        <div className="absolute top-20 right-[25%] text-6xl opacity-10 transform rotate-6 select-none pointer-events-none">✏️</div>
+        <div className="absolute bottom-12 right-[10%] text-5xl opacity-10 transform -rotate-12 select-none pointer-events-none">💡</div>
+        <div className="absolute top-1/2 left-[5%] text-4xl opacity-10 transform -rotate-45 select-none pointer-events-none">🎵</div>
+        <div className="absolute top-1/3 right-[5%] text-5xl opacity-10 transform rotate-45 select-none pointer-events-none">📖</div>
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+
+        <div className="relative max-w-3xl mx-auto text-center z-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 mb-6 text-3xl shadow-inner border border-white/5">
+            🎓
+          </div>
+          <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-6 leading-tight">
+            Ready to sync your classroom?
           </h2>
-          <p className="text-lg text-green-100 mb-10">
-            Join thousands of educators who keep their students on the same page with Clef.
+          <p className="text-lg text-green-100/90 mb-10 max-w-xl mx-auto leading-relaxed font-medium">
+            Take the friction out of syllabus planning, homework tracking, and class progression today.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <div
+            <button
               onClick={() => navigate('/login')}
-              className="flex items-center justify-center gap-3 bg-white text-gray-800 font-semibold px-6 py-3.5 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors shadow-lg"
+              className="w-full sm:w-auto px-8 py-3.5 bg-white text-green-600 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-xl"
             >
               Get started
-            </div>
-            <div
+            </button>
+            <button
               onClick={() => navigate('/login')}
-              className="flex items-center justify-center gap-3 bg-white/10 border border-white/20 text-white font-semibold px-6 py-3.5 rounded-xl cursor-pointer hover:bg-white/20 transition-colors"
+              className="w-full sm:w-auto px-8 py-3.5 bg-white/10 text-white font-bold rounded-xl border border-white/20 hover:bg-white/20 transition-colors"
             >
               Sign in
-            </div>
+            </button>
           </div>
         </div>
       </section>

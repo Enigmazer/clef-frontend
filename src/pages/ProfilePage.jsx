@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Phone, Plus, X, Shield, LogOut, Globe,
@@ -159,16 +159,21 @@ function PhoneSection() {
   const mutations = useProfileMutations()
 
   // add-phone wizard state
-  const [step, setStep] = useState('idle') // 'idle' | 'enter_number' | 'enter_otp'
-  const [countryCode, setCountryCode] = useState('+1')
-  const [newPhone, setNewPhone] = useState('')
-  const [sentPhone, setSentPhone] = useState('') // The full number OTP was sent to
-  const [otpCode, setOtpCode] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [deleting, setDeleting] = useState(null) // phoneNumber being deleted
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [tfaGuardModal, setTfaGuardModal] = useState(false)
+  const [wizard, setWizard] = useState({
+    step: 'idle',       // 'idle' | 'enter_number' | 'enter_otp'
+    countryCode: '+1',
+    newPhone: '',
+    sentPhone: '',
+    otpCode: '',
+    submitting: false,
+    deleting: null,     // phoneNumber string being deleted
+    error: '',
+    success: '',
+    tfaGuardModal: false,
+  })
+
+  const setW = (patch) => setWizard(prev => ({ ...prev, ...patch }))
+  const clearMessages = () => setW({ error: '', success: '' })
 
   const is2faEnabled = user?.twoFactorEnabled ?? false
 
@@ -178,48 +183,41 @@ function PhoneSection() {
         const parts = navigator.language.split('-')
         const region = parts.length > 1 ? parts[1].toUpperCase() : navigator.language.toUpperCase()
         const found = COUNTRIES.find((c) => c.code === region)
-        if (found) setCountryCode(found.dial)
+        if (found) setW({ countryCode: found.dial })
       }
     } catch {
       // safely ignore if parsing fails
     }
   }, [])
 
-  const clearMessages = () => { setError(''); setSuccess('') }
-
   const handleSendOtp = async () => {
-    if (!newPhone.trim()) { setError('Enter a phone number.'); return }
-    const fullNumber = `${countryCode}${newPhone.trim().replace(/[\s-]/g, '')}`
-    if (fullNumber.length > 20) { setError('Phone number is too long.'); return }
+    if (!wizard.newPhone.trim()) { setW({ error: 'Enter a phone number.' }); return }
+    const fullNumber = `${wizard.countryCode}${wizard.newPhone.trim().replace(/[\s-]/g, '')}`
+    if (fullNumber.length > 20) { setW({ error: 'Phone number is too long.' }); return }
 
     clearMessages()
-    setSubmitting(true)
+    setW({ submitting: true })
     try {
       await mutations.addPhoneOtp.mutateAsync(fullNumber)
-      setSentPhone(fullNumber)
-      setStep('enter_otp')
+      setW({ sentPhone: fullNumber, step: 'enter_otp' })
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to send OTP. Check the number and try again.'))
+      setW({ error: getErrorMessage(err, 'Failed to send OTP. Check the number and try again.') })
     } finally {
-      setSubmitting(false)
+      setW({ submitting: false })
     }
   }
 
   const handleVerifyOtp = async () => {
-    if (otpCode.length !== 6) { setError('Enter the 6-digit code.'); return }
+    if (wizard.otpCode.length !== 6) { setW({ error: 'Enter the 6-digit code.' }); return }
     clearMessages()
-    setSubmitting(true)
+    setW({ submitting: true })
     try {
-      await mutations.verifyPhone.mutateAsync({ phone: sentPhone, code: otpCode.trim() })
-      setSuccess('Phone number added successfully.')
-      setStep('idle')
-      setNewPhone('')
-      setSentPhone('')
-      setOtpCode('')
+      await mutations.verifyPhone.mutateAsync({ phone: wizard.sentPhone, code: wizard.otpCode.trim() })
+      setW({ success: 'Phone number added successfully.', step: 'idle', newPhone: '', sentPhone: '', otpCode: '' })
     } catch (err) {
-      setError(getErrorMessage(err, 'Invalid or expired code. Try again.'))
+      setW({ error: getErrorMessage(err, 'Invalid or expired code. Try again.') })
     } finally {
-      setSubmitting(false)
+      setW({ submitting: false })
     }
   }
 
@@ -227,43 +225,39 @@ function PhoneSection() {
     const phoneObj = phones.find(p => p.phoneNumber === phoneNumber)
     const isThisPrimary = phoneObj?.primary === true || phoneObj?.isPrimary === true
     if (is2faEnabled && isThisPrimary) {
-      setTfaGuardModal(true)
+      setW({ tfaGuardModal: true })
       return
     }
 
     clearMessages()
-    setDeleting(phoneNumber)
+    setW({ deleting: phoneNumber })
     try {
       await mutations.deletePhone.mutateAsync(phoneNumber)
-      setSuccess('Phone number removed.')
+      setW({ success: 'Phone number removed.' })
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not remove phone number.'))
+      setW({ error: getErrorMessage(err, 'Could not remove phone number.') })
     } finally {
-      setDeleting(null)
+      setW({ deleting: null })
     }
   }
 
   const handleSetPrimary = async (phoneNumber) => {
     if (is2faEnabled) {
-      setTfaGuardModal(true)
+      setW({ tfaGuardModal: true })
       return
     }
 
     clearMessages()
     try {
       await mutations.setPrimaryPhone.mutateAsync(phoneNumber)
-      setSuccess('Primary phone updated.')
+      setW({ success: 'Primary phone updated.' })
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not set primary phone.'))
+      setW({ error: getErrorMessage(err, 'Could not set primary phone.') })
     }
   }
 
   const cancelAdd = () => {
-    setStep('idle')
-    setNewPhone('')
-    setSentPhone('')
-    setOtpCode('')
-    clearMessages()
+    setW({ step: 'idle', newPhone: '', sentPhone: '', otpCode: '', error: '', success: '' })
   }
 
   const canAdd = phones.length < 2
@@ -285,7 +279,7 @@ function PhoneSection() {
         </div>
       ) : (
         <div className="space-y-2 mb-4">
-          {phones.length === 0 && step === 'idle' && (
+          {phones.length === 0 && wizard.step === 'idle' && (
             <p className="text-sm text-gray-400 dark:text-gray-500">No phone numbers added yet.</p>
           )}
           {phones.map((p) => {
@@ -313,11 +307,11 @@ function PhoneSection() {
                   )}
                   <button
                     onClick={() => handleDelete(p.phoneNumber)}
-                    disabled={deleting === p.phoneNumber}
+                    disabled={wizard.deleting === p.phoneNumber}
                     className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
                     title="Remove"
                   >
-                    {deleting === p.phoneNumber
+                    {wizard.deleting === p.phoneNumber
                       ? <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       : <Trash2 size={14} />}
                   </button>
@@ -329,8 +323,8 @@ function PhoneSection() {
       )}
 
       <div className="space-y-3">
-        <StatusBanner type="error" message={error} onClose={() => setError('')} />
-        <StatusBanner type="success" message={success} onClose={() => setSuccess('')} />
+        <StatusBanner type="error" message={wizard.error} onClose={() => setW({ error: '' })} />
+        <StatusBanner type="success" message={wizard.success} onClose={() => setW({ success: '' })} />
 
         {phones.length > 0 && (
           <div className="mb-2">
@@ -342,7 +336,7 @@ function PhoneSection() {
                 try {
                   await mutations.toggleVisibility.mutateAsync()
                 } catch (err) {
-                  setError(getErrorMessage(err, 'Failed to update visibility.'))
+                  setW({ error: getErrorMessage(err, 'Failed to update visibility.') })
                 }
               }}
               label="Show phone number to students"
@@ -352,9 +346,9 @@ function PhoneSection() {
           </div>
         )}
 
-        {step === 'idle' && canAdd && (
+        {wizard.step === 'idle' && canAdd && (
           <button
-            onClick={() => { setStep('enter_number'); clearMessages() }}
+            onClick={() => setW({ step: 'enter_number', error: '', success: '' })}
             className="flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
           >
             <Plus size={15} />
@@ -362,16 +356,16 @@ function PhoneSection() {
           </button>
         )}
 
-        {step === 'idle' && !canAdd && (
+        {wizard.step === 'idle' && !canAdd && (
           <p className="text-xs text-gray-400 dark:text-gray-500">Maximum of 2 phone numbers reached.</p>
         )}
 
-        {step === 'enter_number' && (
+        {wizard.step === 'enter_number' && (
           <div className="space-y-2.5 pt-1 mt-3 animate-fade-in">
             <div className="flex bg-white dark:bg-[#1e1e1e] border border-gray-300 dark:border-[#2a2a2a] rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-green-500 focus-within:border-transparent transition-shadow">
               <select
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
+                value={wizard.countryCode}
+                onChange={(e) => setW({ countryCode: e.target.value })}
                 className="bg-gray-50 dark:bg-[#1a1a1a] border-r border-gray-300 dark:border-[#2a2a2a] text-gray-900 dark:text-white pl-3 pr-8 py-2.5 text-sm outline-none cursor-pointer"
               >
                 {COUNTRIES.map((c) => (
@@ -383,11 +377,11 @@ function PhoneSection() {
               <input
                 type="tel"
                 placeholder="0000000000"
-                value={newPhone}
+                value={wizard.newPhone}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^\d\s-]/g, '')
-                  const cleanLength = (countryCode + val.replace(/[\s-]/g, '')).length
-                  if (cleanLength <= 20) setNewPhone(val)
+                  const cleanLength = (wizard.countryCode + val.replace(/[\s-]/g, '')).length
+                  if (cleanLength <= 20) setW({ newPhone: val })
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendOtp()}
                 className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 px-3.5 py-2.5 text-sm outline-none w-full"
@@ -397,10 +391,10 @@ function PhoneSection() {
             <div className="flex gap-2">
               <button
                 onClick={handleSendOtp}
-                disabled={submitting}
+                disabled={wizard.submitting}
                 className="flex-1 bg-green-500 text-white text-sm font-medium rounded-xl px-4 py-2.5 hover:bg-green-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? 'Sending…' : 'Send OTP'}
+                {wizard.submitting ? 'Sending…' : 'Send OTP'}
               </button>
               <button onClick={cancelAdd} className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-gray-200 dark:border-[#2a2a2a] rounded-xl">
                 Cancel
@@ -409,18 +403,18 @@ function PhoneSection() {
           </div>
         )}
 
-        {step === 'enter_otp' && (
+        {wizard.step === 'enter_otp' && (
           <div className="space-y-2.5 pt-1 mt-3 animate-fade-in">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              A 6-digit code was sent to <span className="font-medium text-gray-700 dark:text-gray-300">{sentPhone}</span>
+              A 6-digit code was sent to <span className="font-medium text-gray-700 dark:text-gray-300">{wizard.sentPhone}</span>
             </p>
             <input
               type="text"
               inputMode="numeric"
               placeholder="Enter 6-digit code"
               maxLength={6}
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              value={wizard.otpCode}
+              onChange={(e) => setW({ otpCode: e.target.value.replace(/\D/g, '') })}
               onKeyDown={(e) => e.key === 'Enter' && handleVerifyOtp()}
               className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent tracking-widest text-center font-mono"
               autoFocus
@@ -428,13 +422,13 @@ function PhoneSection() {
             <div className="flex gap-2">
               <button
                 onClick={handleVerifyOtp}
-                disabled={submitting}
+                disabled={wizard.submitting}
                 className="flex-1 bg-green-500 text-white text-sm font-medium rounded-xl px-4 py-2.5 hover:bg-green-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? 'Verifying…' : 'Verify'}
+                {wizard.submitting ? 'Verifying…' : 'Verify'}
               </button>
               <button
-                onClick={() => { setStep('enter_number'); setOtpCode(''); setSentPhone(''); clearMessages() }}
+                onClick={() => setW({ step: 'enter_number', otpCode: '', sentPhone: '', error: '', success: '' })}
                 className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-gray-200 dark:border-[#2a2a2a] rounded-xl"
               >
                 Back
@@ -442,7 +436,7 @@ function PhoneSection() {
             </div>
             <button
               onClick={handleSendOtp}
-              disabled={submitting}
+              disabled={wizard.submitting}
               className="text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
             >
               Resend code
@@ -452,7 +446,7 @@ function PhoneSection() {
       </div>
 
       {/* 2FA Guard Modal */}
-      <Modal isOpen={tfaGuardModal} onClose={() => setTfaGuardModal(false)}>
+      <Modal isOpen={wizard.tfaGuardModal} onClose={() => setW({ tfaGuardModal: false })}>
         <div className="flex flex-col items-center text-center pt-2 pb-1">
           <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
             <AlertTriangle className="text-amber-600 dark:text-amber-500" size={24} />
@@ -464,7 +458,7 @@ function PhoneSection() {
           <div className="w-full space-y-2.5 flex flex-col items-stretch">
             <button
               onClick={() => {
-                setTfaGuardModal(false)
+                setW({ tfaGuardModal: false })
                 document.getElementById('security-section')?.scrollIntoView({ behavior: 'smooth' })
               }}
               className="w-full bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-3 rounded-xl transition-colors"
@@ -472,7 +466,7 @@ function PhoneSection() {
               Go to Security Settings
             </button>
             <button
-              onClick={() => setTfaGuardModal(false)}
+              onClick={() => setW({ tfaGuardModal: false })}
               className="w-full bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] text-gray-700 dark:text-gray-300 text-sm font-medium py-3 rounded-xl transition-colors"
             >
               Cancel
@@ -802,7 +796,7 @@ function DashboardVisibilitySection({ user }) {
 // ─── Sessions section ─────────────────────────────────────────────────────────
 function SessionSection() {
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { refreshUser } = useAuth()
   const [loadingThis, setLoadingThis] = useState(false)
   const [loadingAll, setLoadingAll] = useState(false)
   const [error, setError] = useState('')
@@ -812,10 +806,10 @@ function SessionSection() {
     setError('')
     try {
       await logoutApi()
-      setUser(null)
+      refreshUser(null)
       navigate('/login', { replace: true })
     } catch {
-      setUser(null)
+      refreshUser(null)
       navigate('/login', { replace: true })
     }
   }
@@ -825,7 +819,7 @@ function SessionSection() {
     setError('')
     try {
       await logoutAllApi()
-      setUser(null)
+      refreshUser(null)
       navigate('/login', { replace: true })
     } catch (err) {
       setError(getErrorMessage(err, 'Something went wrong.'))
@@ -874,6 +868,68 @@ function SessionSection() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const { user } = useAuth()
+  const mutations = useProfileMutations()
+  const fileInputRef = useRef(null)
+  const [avatarError, setAvatarError] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [previewFile, setPreviewFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setAvatarError('Only JPEG and PNG formats are supported.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      setAvatarError('Avatar size must be less than 3MB.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    setAvatarError('')
+    setPreviewFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleConfirmUpload = async () => {
+    if (!previewFile) return
+    setAvatarUploading(true)
+    setAvatarError('')
+    try {
+      await mutations.uploadAvatar.mutateAsync(previewFile)
+      closePreviewModal()
+    } catch (err) {
+      setAvatarError(getErrorMessage(err, 'Failed to upload avatar.'))
+      setAvatarUploading(false)
+    }
+  }
+
+  const closePreviewModal = () => {
+    setPreviewFile(null)
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
+    }
+    setAvatarUploading(false)
+  }
+
+  const handleDeleteAvatar = async () => {
+    setAvatarError('')
+    setAvatarUploading(true)
+    try {
+      await mutations.deleteAvatar.mutateAsync()
+    } catch (err) {
+      setAvatarError(getErrorMessage(err, 'Failed to delete avatar.'))
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
@@ -882,8 +938,16 @@ export default function ProfilePage() {
 
         {/* ── Profile header card ── */}
         <Card>
-          <div className="flex items-center gap-5">
-            <Avatar user={user} size={72} />
+          {avatarError && <StatusBanner type="error" message={avatarError} onClose={() => setAvatarError('')} />}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="relative isolate shrink-0">
+              <Avatar user={user} size={80} />
+              {avatarUploading && (
+                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center z-10 transition-opacity">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -903,6 +967,25 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/jpeg, image/png" onChange={handleAvatarSelect} />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="text-xs font-medium px-3 py-1.5 bg-gray-100 dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-lg transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                >
+                  Change Avatar
+                </button>
+                {user?.avatarUrl && (
+                  <button 
+                    onClick={handleDeleteAvatar}
+                    disabled={avatarUploading}
+                    className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </Card>
@@ -913,6 +996,41 @@ export default function ProfilePage() {
         <SecuritySection user={user} />
         <SessionSection />
       </div>
+
+      {/* Avatar Preview Modal */}
+      <Modal isOpen={!!previewFile} onClose={closePreviewModal} title="Preview Avatar">
+        <div className="flex flex-col items-center pt-2 pb-1">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 text-center">
+            This is how your avatar will look.
+          </p>
+          <div className="relative mb-8">
+            <div className="w-40 h-40 rounded-full overflow-hidden ring-4 ring-green-100 dark:ring-green-950/50 bg-gray-100 dark:bg-[#1a1a1a]">
+              {previewUrl && (
+                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+              )}
+            </div>
+          </div>
+          
+          <div className="w-full space-y-2.5 flex flex-col items-stretch">
+            <button
+              onClick={handleConfirmUpload}
+              disabled={avatarUploading}
+              className="w-full bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-3 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            >
+              {avatarUploading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {avatarUploading ? 'Uploading…' : 'Upload'}
+            </button>
+            <button
+              onClick={closePreviewModal}
+              disabled={avatarUploading}
+              className="w-full bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] text-gray-700 dark:text-gray-300 text-sm font-medium py-3 rounded-xl transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   )
 }

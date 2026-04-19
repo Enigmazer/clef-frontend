@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { getMe } from '../api/users'
 import { logout as logoutApi } from '../api/auth'
 import { tokenStore } from '../api/tokenStore'
@@ -44,13 +44,15 @@ export function AuthProvider({ children }) {
     window.location.href = '/login'
   }
 
+  const refreshUser = useCallback((data) => setUser(data), [])
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAuthenticated: user !== null,
-        setUser,
+        refreshUser,
         onLoginSuccess,
         logout,
       }}

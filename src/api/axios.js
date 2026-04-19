@@ -35,7 +35,13 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     const url = originalRequest.url ?? ''
-    const skipRefresh = url.includes('/auth/refresh') || url.includes('/auth/login')
+    let skipRefresh = false
+    try {
+      const pathname = new URL(url, import.meta.env.VITE_API_URL).pathname
+      skipRefresh = pathname.endsWith('/auth/refresh') || pathname.endsWith('/auth/login')
+    } catch {
+      skipRefresh = url.includes('/auth/refresh') || url.includes('/auth/login')
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry && !skipRefresh) {
       if (isRefreshing) {

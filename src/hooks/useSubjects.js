@@ -10,7 +10,8 @@ import {
   bulkAddUnits,
   lockUnlockSubject,
   archiveUnarchiveSubject,
-  setSyllabusUrl,
+  uploadSyllabus,
+  deleteSyllabus,
   setCurrentTopic,
   setNextTopic,
   deleteSubject,
@@ -116,10 +117,18 @@ export function useArchiveUnarchiveSubject(subjectId) {
   })
 }
 
-export function useSetSyllabusUrl(subjectId) {
+export function useUploadSyllabus(subjectId) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (syllabusUrl) => setSyllabusUrl(subjectId, syllabusUrl),
+    mutationFn: (file) => uploadSyllabus(subjectId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
+  })
+}
+
+export function useDeleteSyllabus(subjectId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteSyllabus(subjectId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
   })
 }

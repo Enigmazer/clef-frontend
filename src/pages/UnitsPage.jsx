@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, Plus, Trash2, ChevronDown, ChevronRight,
@@ -8,7 +8,9 @@ import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
 import { useTeacherSubjectDetail, useBulkAddUnits } from '../hooks/useSubjects'
 import { useUpdateUnit, useDeleteUnit } from '../hooks/useUnits'
-import { useUpdateTopics, useDeleteTopics } from '../hooks/useTopics'
+import { useUpdateTopics, useDeleteTopics, useDeleteTopicMaterials, useUploadTopicMaterial } from '../hooks/useTopics'
+import TopicMaterialPill from '../components/TopicMaterialPill'
+import ConfirmModal from '../components/ConfirmModal'
 
 function buildDefaultUnits(count, existingCount) {
   return Array.from({ length: count }, (_, i) => {
@@ -21,21 +23,107 @@ function buildDefaultUnits(count, existingCount) {
   })
 }
 
+// ─── Upload Content Modal ──────────────────────────────────────────────────────
+function UploadContentModal({ isOpen, onClose, unit, uploadMaterialMutation }) {
+  const fileInputRef = useRef(null)
+  const [selectedTopicId, setSelectedTopicId] = useState(null)
+
+  const handleTopicClick = (topicId) => {
+    setSelectedTopicId(topicId)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    setTimeout(() => {
+      fileInputRef.current?.click()
+    }, 50)
+  }
+
+  const handleFileChange = async (e) => {
+     const file = e.target.files?.[0]
+     if (!file || !selectedTopicId) return
+
+     const allowedTypes = [
+       "audio/mpeg", "audio/mp4", "video/mp4", "video/x-matroska",
+       "application/pdf", "image/jpeg", "image/png", "application/msword",
+       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+     ];
+
+     if (!allowedTypes.includes(file.type)) {
+       alert("Unsupported file type. Please upload a valid document, image, or media file.");
+       e.target.value = null;
+       return;
+     }
+
+     if (file.size > 50 * 1024 * 1024) {
+       alert("File size must be 50MB or less.");
+       e.target.value = null;
+       return;
+     }
+
+     try {
+       onClose()
+       await uploadMaterialMutation.mutateAsync({ unitId: unit.id, topicId: selectedTopicId, file })
+     } catch(err) {
+       console.error(err)
+       alert(err?.response?.data?.message || 'Failed to upload material')
+     }
+     e.target.value = null
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Add Content to ${unit.title}`}>
+      <div className="pt-2 pb-4">
+         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 px-2">Select a topic to upload your material to:</p>
+         
+         <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="audio/mpeg,audio/mp4,video/mp4,video/x-matroska,application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+
+          <div className="space-y-2 px-1 max-h-[60vh] overflow-y-auto">
+            {unit.topics.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No topics available in this unit.</p>
+            ) : (
+              unit.topics.map(topic => (
+                <button
+                  key={topic.id}
+                  onClick={() => handleTopicClick(topic.id)}
+                  className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 dark:bg-[#1a1a1a] dark:hover:bg-[#222] border border-gray-100 dark:border-[#2a2a2a] rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                >
+                  {topic.title}
+                </button>
+              ))
+            )}
+          </div>
+       </div>
+    </Modal>
+  )
+}
+
 // ─── Existing unit viewer and editor ──────────────────────────────────────────
+
 function ExistingUnitRow({ subjectId, unit }) {
   const [open, setOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
   
   const { mutateAsync: updateUnit, isPending: isUpdating } = useUpdateUnit(subjectId)
   const { mutateAsync: deleteUnit, isPending: isDeleting } = useDeleteUnit(subjectId)
   const { mutateAsync: updateTopics } = useUpdateTopics(subjectId)
   const { mutateAsync: deleteTopics } = useDeleteTopics(subjectId)
+  const deleteMaterialMutation = useDeleteTopicMaterials(subjectId)
+  const uploadMaterialMutation = useUploadTopicMaterial(subjectId)
+
+  // Material selection state
+  const [selectedMaterials, setSelectedMaterials] = useState({})
   
   // Unit edit state
   const [editTitle, setEditTitle] = useState(unit.title)
   const [oldTopics, setOldTopics] = useState([])
   const [newTopics, setNewTopics] = useState([])
   const [unitError, setUnitError] = useState('')
+
+  // Confirm states
+  const [confirmUnitDeleteOpen, setConfirmUnitDeleteOpen] = useState(false)
+  const [topicToDeleteIndex, setTopicToDeleteIndex] = useState(null)
+  const [isConfirmingSaveDeletions, setIsConfirmingSaveDeletions] = useState(false)
+
+  const materialsToDeleteCount = Object.values(selectedMaterials).flat().length
 
   const handleEditClick = () => {
     setEditTitle(unit.title)
@@ -47,8 +135,13 @@ function ExistingUnitRow({ subjectId, unit }) {
 
   const handleUnitDelete = async (e) => {
     e.stopPropagation()
+    setConfirmUnitDeleteOpen(true)
+  }
+
+  const confirmUnitDeletion = async () => {
     try {
       await deleteUnit(unit.id)
+      setConfirmUnitDeleteOpen(false)
     } catch (err) {
       console.error(err)
     }
@@ -78,6 +171,11 @@ function ExistingUnitRow({ subjectId, unit }) {
     
     const cleanNewTopics = newTopics.filter(t => t.title.trim())
     
+    if (materialsToDeleteCount > 0 && !isConfirmingSaveDeletions) {
+       setIsConfirmingSaveDeletions(true)
+       return
+    }
+
     try {
       setUnitError('')
       const promises = []
@@ -89,6 +187,13 @@ function ExistingUnitRow({ subjectId, unit }) {
       if (deletedTopicIds.length > 0) {
         promises.push(deleteTopics({ unitId: unit.id, topicIds: deletedTopicIds }))
       }
+
+      // Add material deletions (skipping topics that are already entirely deleted)
+      Object.entries(selectedMaterials).forEach(([topicId, matIds]) => {
+         if (matIds.length > 0 && !deletedTopicIds.includes(topicId)) {
+            promises.push(deleteMaterialMutation.mutateAsync({ unitId: unit.id, topicId, materialIds: matIds }))
+         }
+      })
       
       promises.push(updateUnit({
         unitId: unit.id,
@@ -100,6 +205,8 @@ function ExistingUnitRow({ subjectId, unit }) {
       
       await Promise.all(promises)
       
+      setIsConfirmingSaveDeletions(false)
+      setSelectedMaterials({})
       setIsEditing(false)
       setNewTopics([])
     } catch (err) {
@@ -151,25 +258,62 @@ function ExistingUnitRow({ subjectId, unit }) {
         <div className="px-4 py-3 space-y-2">
           {/* Old Topics (Editable inline with topic controller) */}
           {oldTopics.map((t, idx) => (
-            <div key={t.id} className="flex items-center gap-2">
-              <BookOpen size={12} className="text-gray-400 shrink-0 ml-4" />
-              <input
-                type="text"
-                value={t.title}
-                onChange={(e) => {
-                   const arr = [...oldTopics]
-                   arr[idx].title = e.target.value
-                   setOldTopics(arr)
-                }}
-                placeholder="Topic title"
-                className="flex-1 bg-white dark:bg-[#111] border border-gray-200 dark:border-[#333] focus:border-green-200 dark:focus:border-green-800 rounded-lg px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-green-500 transition-shadow"
-              />
-              <button
-                 onClick={() => setOldTopics(oldTopics.filter((_, i) => i !== idx))}
-                 className="text-gray-400 hover:text-red-500 transition-colors"
-              >
-                 <X size={14} />
-              </button>
+            <div key={t.id} className="flex flex-col gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <BookOpen size={12} className="text-gray-400 shrink-0 ml-4" />
+                <input
+                  type="text"
+                  value={t.title}
+                  onChange={(e) => {
+                    const arr = [...oldTopics]
+                    arr[idx].title = e.target.value
+                    setOldTopics(arr)
+                  }}
+                  placeholder="Topic title"
+                  className="flex-1 bg-white dark:bg-[#111] border border-gray-200 dark:border-[#333] focus:border-green-200 dark:focus:border-green-800 rounded-lg px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-green-500 transition-shadow"
+                />
+                <button
+                  onClick={() => {
+                     const original = unit.topics.find(ut => ut.id === t.id);
+                     if (original && original.topicMaterials && original.topicMaterials.length > 0) {
+                        setTopicToDeleteIndex(idx);
+                     } else {
+                        setOldTopics(oldTopics.filter((_, i) => i !== idx));
+                     }
+                  }}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {t.topicMaterials && t.topicMaterials.length > 0 && (
+                <div className="pl-9 pr-8">
+                  <div className="flex items-center justify-between mb-1.5 mt-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Materials <span className="normal-case font-medium ml-1 text-gray-300 dark:text-gray-600">(Select to delete)</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {t.topicMaterials.map(mat => (
+                      <TopicMaterialPill
+                        key={mat.id}
+                        subjectId={subjectId}
+                        unitId={unit.id}
+                        topicId={t.id}
+                        material={mat}
+                        onSelect={(matId) => {
+                          setSelectedMaterials(prev => {
+                            const arr = prev[t.id] || [];
+                            return { ...prev, [t.id]: arr.includes(matId) ? arr.filter(id => id !== matId) : [...arr, matId] }
+                          })
+                        }}
+                        isSelected={selectedMaterials[t.id]?.includes(mat.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -205,16 +349,38 @@ function ExistingUnitRow({ subjectId, unit }) {
             Add new topic
           </button>
         </div>
+
+        <ConfirmModal
+          isOpen={isConfirmingSaveDeletions}
+          onClose={() => setIsConfirmingSaveDeletions(false)}
+          onConfirm={handleUnitSave}
+          title="Save with Deletions"
+          message={`You have selected ${materialsToDeleteCount} material(s) for deletion. Saving now will permanently remove them. Are you sure?`}
+          confirmText="Save & Delete"
+          loading={isUpdating || deleteMaterialMutation.isPending}
+        />
+
+        <ConfirmModal
+          isOpen={topicToDeleteIndex !== null}
+          onClose={() => setTopicToDeleteIndex(null)}
+          onConfirm={() => {
+             setOldTopics(oldTopics.filter((_, i) => i !== topicToDeleteIndex))
+             setTopicToDeleteIndex(null)
+          }}
+          title="Remove Topic"
+          message="This topic contains materials. Removing it will permanently delete all of its materials when you save. This action cannot be undone."
+          confirmText="Remove"
+        />
       </div>
     )
   }
 
   return (
     <div className="border border-gray-200 dark:border-[#2a2a2a] rounded-xl overflow-hidden group">
-      <div className="w-full flex items-center justify-between px-4 py-3.5 bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors">
+      <div className="w-full flex items-stretch justify-between bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors">
         <button
           onClick={() => setOpen(o => !o)}
-          className="flex-1 flex items-center gap-3 text-left outline-none"
+          className="flex-1 flex items-center gap-3 px-4 py-3.5 text-left outline-none"
         >
           <Layers size={15} className="text-green-500 shrink-0" />
           <span className="text-sm font-semibold text-gray-900 dark:text-white">{unit.title}</span>
@@ -222,18 +388,24 @@ function ExistingUnitRow({ subjectId, unit }) {
             {unit.topics.length} topic{unit.topics.length !== 1 ? 's' : ''}
           </span>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pr-4 py-3.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); setUploadModalOpen(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Plus size={13} />
+            Add Content
+          </button>
           <button
             onClick={handleEditClick}
-            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
+            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50 ml-1"
             title="Edit Unit"
           >
             <Edit2 size={14} />
           </button>
           <button
             onClick={handleUnitDelete}
-            disabled={isDeleting}
-            className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
             title="Delete Unit"
           >
             <Trash2 size={14} />
@@ -249,13 +421,44 @@ function ExistingUnitRow({ subjectId, unit }) {
              <div className="px-10 py-3 text-xs text-gray-400 italic">No topics in this unit.</div>
           )}
           {unit.topics.map(t => (
-            <div key={t.id} className="flex items-center gap-3 px-10 py-2.5 hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors">
-              <BookOpen size={12} className="text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-600 dark:text-gray-300">{t.title}</span>
+            <div key={t.id} className="flex flex-col px-10 py-3 hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors border-b border-gray-100 dark:border-[#2a2a2a] last:border-0 border-opacity-50">
+              <div className="flex items-center gap-3">
+                <BookOpen size={12} className="text-gray-400 shrink-0" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.title}</span>
+              </div>
+              
+              {t.topicMaterials && t.topicMaterials.length > 0 && (
+                <div className="flex flex-col gap-1.5 mt-2 pl-6">
+                  {t.topicMaterials.map(mat => (
+                    <TopicMaterialPill
+                      key={mat.id}
+                      subjectId={subjectId}
+                      unitId={unit.id}
+                      topicId={t.id}
+                      material={mat}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
+      <UploadContentModal 
+        isOpen={uploadModalOpen} 
+        onClose={() => setUploadModalOpen(false)} 
+        unit={unit} 
+        uploadMaterialMutation={uploadMaterialMutation} 
+      />
+      <ConfirmModal
+        isOpen={confirmUnitDeleteOpen}
+        onClose={() => setConfirmUnitDeleteOpen(false)}
+        onConfirm={confirmUnitDeletion}
+        title="Delete Unit"
+        message="Are you sure you want to delete this unit? All topics and their associated materials will be permanently deleted. This action cannot be undone."
+        confirmText="Delete"
+        loading={isDeleting}
+      />
     </div>
   )
 }

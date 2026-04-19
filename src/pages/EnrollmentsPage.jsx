@@ -171,9 +171,9 @@ export default function EnrollmentsPage() {
 
                 <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
                   <span className="flex items-center gap-1.5 font-medium text-gray-700 dark:text-gray-300">
-                    <img 
-                      src={subject.teacherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(subject.teacherName || 'Teacher')}&background=random&color=fff`} 
-                      alt="Teacher avatar" 
+                    <img
+                      src={subject.teacherAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(subject.teacherName || 'Teacher')}&background=random&color=fff`}
+                      alt="Teacher avatar"
                       className="w-5 h-5 rounded-full object-cover"
                       onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(subject.teacherName || 'T')}&background=6ee7b7&color=065f46` }}
                     />

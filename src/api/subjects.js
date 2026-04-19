@@ -30,8 +30,16 @@ export const lockUnlockSubject = (id) =>
 export const archiveUnarchiveSubject = (id) =>
   api.patch(`/subjects/${id}/preferences/archive/toggle`).then((res) => res.data)
 
-export const setSyllabusUrl = (id, syllabusUrl) =>
-  api.patch(`/subjects/${id}/syllabus`, { syllabusUrl }).then((res) => res.data)
+export const uploadSyllabus = (id, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.patch(`/subjects/${id}/syllabus`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((res) => res.data)
+}
+
+export const deleteSyllabus = (id) =>
+  api.delete(`/subjects/${id}/syllabus`)
 
 export const setCurrentTopic = (id, topicId, unitId) =>
   api.patch(`/subjects/${id}/current-topic`, { id: topicId, unitId }).then((res) => res.data)

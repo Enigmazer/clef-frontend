@@ -1,79 +1,15 @@
-import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ChevronLeft, ChevronDown, ChevronRight, Layers, CircleDot, Circle, CheckCircle2, AlertCircle, Link2, Phone
+  ChevronLeft, Layers, CheckCircle2, AlertCircle, Link2, Phone
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useStudentSubjectDetail } from '../hooks/useSubjects'
+import { UnitAccordion } from '../components/CurriculumAccordion'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function formatDate(instant) {
   if (!instant) return '—'
   return new Date(instant).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-// ─── Unit accordion ────────────────────────────────────────────────────────────
-function UnitAccordion({ unit, currentTopicId, nextTopicId }) {
-  const [open, setOpen] = useState(true)
-  const completedCount = unit.topics.filter(t => t.completedAt).length
-
-  return (
-    <div className="border border-gray-200 dark:border-[#2a2a2a] rounded-xl overflow-hidden mb-3 last:mb-0">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
-          <Layers size={15} className="text-green-500 shrink-0" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">{unit.title}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400 dark:text-gray-500">{completedCount}/{unit.topics.length} done</span>
-          {open ? <ChevronDown size={15} className="text-gray-400" /> : <ChevronRight size={15} className="text-gray-400" />}
-        </div>
-      </button>
-
-      {open && (
-        <div className="divide-y divide-gray-100 dark:divide-[#2a2a2a] bg-gray-50 dark:bg-[#111] animate-fade-in">
-          {unit.topics.length === 0 && (
-            <p className="px-10 py-3 text-xs text-gray-400 italic">No topics in this unit.</p>
-          )}
-          {unit.topics.map(topic => {
-            const isCurrent = topic.id === currentTopicId
-            const isNext = topic.id === nextTopicId
-            const isDone = !!topic.completedAt
-            return (
-              <div
-                key={topic.id}
-                className={`flex items-center gap-3 px-10 py-3 ${
-                  isCurrent ? 'bg-green-50 dark:bg-[#052e16]/50'
-                  : isNext ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
-                }`}
-              >
-                {isDone
-                  ? <CheckCircle2 size={15} className="text-green-500 shrink-0" />
-                  : isCurrent
-                  ? <CircleDot size={15} className="text-green-500 shrink-0 animate-pulse" />
-                  : <Circle size={15} className="text-gray-300 dark:text-gray-600 shrink-0" />}
-
-                <span className={`text-sm flex-1 ${
-                  isDone ? 'text-gray-400 dark:text-gray-500 line-through'
-                  : isCurrent ? 'text-green-700 dark:text-green-400 font-medium'
-                  : 'text-gray-700 dark:text-gray-300'
-                }`}>{topic.title}</span>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {isCurrent && <span className="text-[10px] font-bold uppercase tracking-wider bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-md">Current</span>}
-                  {isNext && !isCurrent && <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-md">Next</span>}
-                  {isDone && <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatDate(topic.completedAt)}</span>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
@@ -241,7 +177,7 @@ export default function StudentSubjectDetailPage() {
               ) : (
                 <div>
                   {subject.units.map(unit => (
-                    <UnitAccordion key={unit.id} unit={unit} currentTopicId={currentTopicId} nextTopicId={nextTopicId} />
+                    <UnitAccordion key={unit.id} unit={unit} currentTopicId={currentTopicId} nextTopicId={nextTopicId} subjectId={subjectId} />
                   ))}
                 </div>
               )}

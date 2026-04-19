@@ -4,17 +4,20 @@ import {
   ChevronLeft, ChevronDown, ChevronRight, Copy, Check,
   Lock, LockOpen, Layers, Archive, ArchiveRestore,
   CircleDot, Circle, CheckCircle2, AlertCircle, Settings,
-  Pencil, Trash2, X, Save, CirclePlay, SkipForward,
+  Pencil, Trash2, X, Save, CirclePlay, SkipForward, Plus,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
 import {
   useTeacherSubjectDetail, useEnrolledStudents,
   useLockUnlockSubject, useArchiveUnarchiveSubject,
-  useUpdateSubject, useSetSyllabusUrl, useSetCurrentTopic,
+  useUpdateSubject, useUploadSyllabus, useDeleteSyllabus, useSetCurrentTopic,
   useSetNextTopic, useDeleteSubject,
 } from '../hooks/useSubjects'
 import { useToggleTopicComplete } from '../hooks/useTopics'
+import TopicMaterialPill from '../components/TopicMaterialPill'
+import ConfirmModal from '../components/ConfirmModal'
+import { UnitAccordion } from '../components/CurriculumAccordion'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function formatDate(instant) {
@@ -113,75 +116,6 @@ function TopicPickerModal({ isOpen, onClose, units, mode, onPick, currentId, nex
   )
 }
 
-// ─── Unit accordion ────────────────────────────────────────────────────────────
-function UnitAccordion({ unit, currentTopicId, nextTopicId, onToggleComplete, isArchived }) {
-  const [open, setOpen] = useState(true)
-  const completedCount = unit.topics.filter(t => t.completedAt).length
-
-  return (
-    <div className="border border-gray-200 dark:border-[#2a2a2a] rounded-xl overflow-hidden mb-3 last:mb-0">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
-          <Layers size={15} className="text-green-500 shrink-0" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">{unit.title}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400 dark:text-gray-500">{completedCount}/{unit.topics.length} done</span>
-          {open ? <ChevronDown size={15} className="text-gray-400" /> : <ChevronRight size={15} className="text-gray-400" />}
-        </div>
-      </button>
-
-      {open && (
-        <div className="divide-y divide-gray-100 dark:divide-[#2a2a2a] bg-gray-50 dark:bg-[#111] animate-fade-in">
-          {unit.topics.length === 0 && (
-            <p className="px-10 py-3 text-xs text-gray-400 italic">No topics in this unit.</p>
-          )}
-          {unit.topics.map(topic => {
-            const isCurrent = topic.id === currentTopicId
-            const isNext = topic.id === nextTopicId
-            const isDone = !!topic.completedAt
-            return (
-              <div
-                key={topic.id}
-                className={`flex items-center gap-3 px-10 py-3 ${isCurrent ? 'bg-green-50 dark:bg-[#052e16]/50'
-                  : isNext ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
-                  }`}
-              >
-                <button
-                  onClick={() => !isArchived && onToggleComplete(unit.id, topic.id)}
-                  disabled={isArchived}
-                  title={isDone ? "Mark as incomplete" : "Mark as complete"}
-                  className={`mt-0.5 shrink-0 transition-colors outline-none ${!isArchived ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
-                >
-                  {isDone
-                    ? <CheckCircle2 size={15} className="text-green-500" />
-                    : isCurrent
-                      ? <CircleDot size={15} className="text-green-500 animate-pulse" />
-                      : <Circle size={15} className={`text-gray-300 dark:text-gray-600 ${!isArchived ? 'hover:text-green-400 dark:hover:text-green-500' : ''}`} />}
-                </button>
-
-                <span className={`text-sm flex-1 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through'
-                  : isCurrent ? 'text-green-700 dark:text-green-400 font-medium'
-                    : 'text-gray-700 dark:text-gray-300'
-                  }`}>{topic.title}</span>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {isCurrent && <span className="text-[10px] font-bold uppercase tracking-wider bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-md">Current</span>}
-                  {isNext && !isCurrent && <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-md">Next</span>}
-                  {isDone && <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatDate(topic.completedAt)}</span>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function SubjectDetailPage() {
   const { id } = useParams()
@@ -193,7 +127,8 @@ export default function SubjectDetailPage() {
   const lockMutation = useLockUnlockSubject(subjectId)
   const archiveMutation = useArchiveUnarchiveSubject(subjectId)
   const updateMutation = useUpdateSubject(subjectId)
-  const syllabusMutation = useSetSyllabusUrl(subjectId)
+  const uploadSyllabusMutation = useUploadSyllabus(subjectId)
+  const deleteSyllabusMutation = useDeleteSyllabus(subjectId)
   const currentMutation = useSetCurrentTopic(subjectId)
   const nextMutation = useSetNextTopic(subjectId)
   const deleteMutation = useDeleteSubject()
@@ -204,9 +139,7 @@ export default function SubjectDetailPage() {
   const [editDesc, setEditDesc] = useState('')
   const [isEditing, setIsEditing] = useState(false)
 
-  // Syllabus edit
-  const [syllabusInput, setSyllabusInput] = useState('')
-  const [showSyllabusEdit, setShowSyllabusEdit] = useState(false)
+  // Syllabus variables no longer needed as we upload file directly
 
   // Modals & Overlays
   const [showSettings, setShowSettings] = useState(false)
@@ -263,12 +196,36 @@ export default function SubjectDetailPage() {
     catch (err) { setActionError(getErrorMsg(err)) }
   }
 
-  const handleSaveSyllabus = async () => {
+  const handleUploadSyllabus = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.type !== 'application/pdf') {
+      setActionError('Only PDF files are supported.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setActionError('File size must be 10MB or less.')
+      return
+    }
+
     setActionError('')
     try {
-      await syllabusMutation.mutateAsync(syllabusInput.trim() || null)
-      setShowSyllabusEdit(false)
-    } catch (err) { setActionError(getErrorMsg(err)) }
+      await uploadSyllabusMutation.mutateAsync(file)
+    } catch (err) {
+      setActionError(getErrorMsg(err))
+    }
+    e.target.value = null // reset
+  }
+
+  const handleDeleteSyllabus = async () => {
+    if (!window.confirm("Are you sure you want to delete the syllabus?")) return;
+    setActionError('')
+    try {
+      await deleteSyllabusMutation.mutateAsync()
+    } catch (err) {
+      setActionError(getErrorMsg(err))
+    }
   }
 
   const handlePickTopic = async (topic, unit, mode) => {
@@ -429,54 +386,86 @@ export default function SubjectDetailPage() {
               </div>
 
               {/* Current */}
-              <div className="bg-green-50 dark:bg-[#052e16]/60 border border-green-200 dark:border-green-900/50 rounded-xl px-4 py-3.5 flex flex-col justify-center">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Currently Teaching</p>
-                  {!subject.archived && subject.units?.length > 0 && (
-                    <button
-                      onClick={() => setTopicPicker('current')}
-                      disabled={currentMutation.isPending || (availableForCurrent === 0 && !subject.currentTopic)}
-                      className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <CirclePlay size={11} />
-                      {subject.currentTopic ? 'Change' : 'Set'}
-                    </button>
-                  )}
+              <button
+                disabled={subject.archived || subject.units?.length === 0 || (availableForCurrent === 0 && !subject.currentTopic)}
+                onClick={() => setTopicPicker('current')}
+                className={`flex flex-col justify-center text-left px-4 py-3.5 rounded-xl border transition-all relative group
+                  ${subject.currentTopic 
+                    ? 'bg-green-50 dark:bg-[#052e16]/40 border-green-200 dark:border-green-900/40 hover:bg-green-100 dark:hover:bg-[#052e16]/60' 
+                    : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#2a2a2a] hover:border-green-500/50 hover:shadow-md'
+                  }
+                  disabled:opacity-60 disabled:cursor-not-allowed
+                `}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${
+                    subject.currentTopic ? 'text-green-600 dark:text-green-500' : 'text-gray-400 dark:text-gray-500'
+                  }`}>Currently Teaching</p>
+                  
+                  <div className={`p-1 rounded-full transition-colors ${
+                    subject.currentTopic ? 'bg-green-200/50 dark:bg-green-900/30 text-green-700' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400'
+                  } group-hover:bg-green-500 group-hover:text-white`}>
+                    <CirclePlay size={14} />
+                  </div>
                 </div>
-                {subject.currentTopic
-                  ? <>
+
+                {subject.currentTopic ? (
+                  <>
                     <p className="text-sm font-semibold text-green-800 dark:text-green-300 line-clamp-1">{subject.currentTopic.title}</p>
                     <p className="text-[11px] text-green-600/70 dark:text-green-500/70 mt-0.5 truncate">{subject.currentTopic.unit?.title}</p>
                   </>
-                  : <p className="text-sm text-green-700/50 dark:text-green-500/50 italic">
-                    {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
-                  </p>}
-              </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 italic">
+                      {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
+                    </p>
+                    {!isSyllabusCompleted && (
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Click to select current topic</p>
+                    )}
+                  </div>
+                )}
+              </button>
 
               {/* Next */}
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl px-4 py-3.5 flex flex-col justify-center">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Up Next</p>
-                  {!subject.archived && subject.units?.length > 0 && (
-                    <button
-                      onClick={() => setTopicPicker('next')}
-                      disabled={nextMutation.isPending || (availableForNext === 0 && !subject.nextTopic)}
-                      className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <SkipForward size={11} />
-                      {subject.nextTopic ? 'Change' : 'Set'}
-                    </button>
-                  )}
+              <button
+                disabled={subject.archived || subject.units?.length === 0 || (availableForNext === 0 && !subject.nextTopic)}
+                onClick={() => setTopicPicker('next')}
+                className={`flex flex-col justify-center text-left px-4 py-3.5 rounded-xl border transition-all relative group
+                  ${subject.nextTopic 
+                    ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-950/40' 
+                    : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#2a2a2a] hover:border-blue-500/50 hover:shadow-md'
+                  }
+                  disabled:opacity-60 disabled:cursor-not-allowed
+                `}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${
+                    subject.nextTopic ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
+                  }`}>Up Next</p>
+                  
+                  <div className={`p-1 rounded-full transition-colors ${
+                    subject.nextTopic ? 'bg-blue-200/50 dark:bg-blue-900/30 text-blue-700' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400'
+                  } group-hover:bg-blue-500 group-hover:text-white`}>
+                    <SkipForward size={14} />
+                  </div>
                 </div>
-                {subject.nextTopic
-                  ? <>
+
+                {subject.nextTopic ? (
+                  <>
                     <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 line-clamp-1">{subject.nextTopic.title}</p>
                     <p className="text-[11px] text-blue-600/70 dark:text-blue-500/70 mt-0.5 truncate">{subject.nextTopic.unit?.title}</p>
                   </>
-                  : <p className="text-sm text-blue-700/50 dark:text-blue-500/50 italic">
-                    {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
-                  </p>}
-              </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 italic">
+                      {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
+                    </p>
+                    {!isSyllabusCompleted && (
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Click to select next topic</p>
+                    )}
+                  </div>
+                )}
+              </button>
             </div>
 
             {/* Curriculum */}
@@ -488,7 +477,7 @@ export default function SubjectDetailPage() {
                     onClick={() => navigate(`/subjects/${id}/units`)}
                     className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
                   >
-                    Manage units
+                    Curriculum Management
                   </button>
                 )}
               </div>
@@ -507,6 +496,7 @@ export default function SubjectDetailPage() {
                       nextTopicId={nextTopicId}
                       onToggleComplete={handleToggleComplete}
                       isArchived={subject.archived}
+                      subjectId={subjectId}
                     />
                   ))}
                 </div>
@@ -575,22 +565,29 @@ export default function SubjectDetailPage() {
 
                 <SettingRow
                   title="Syllabus"
-                  description="Link to an external syllabus file (Google Drive, PDF, etc)."
+                  description="Upload a syllabus PDF file (Max 10MB)."
                   action={
-                    showSyllabusEdit ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <input type="url" value={syllabusInput} onChange={e => setSyllabusInput(e.target.value)} placeholder="https://..." className="w-32 text-xs bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-green-500 text-gray-900 dark:text-white" autoFocus />
-                        <button onClick={handleSaveSyllabus} disabled={syllabusMutation.isPending} className="text-xs font-medium bg-green-500 hover:bg-green-600 text-white rounded-md px-2.5 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{syllabusMutation.isPending ? '…' : 'Save'}</button>
-                        <button onClick={() => setShowSyllabusEdit(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={13} /></button>
-                      </div>
-                    ) : subject?.syllabusFileUrl ? (
-                      <div className="flex items-center gap-2">
-                        <a href={subject.syllabusFileUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium">{subject.syllabusFileUrl}</a>
-                        <button onClick={() => { setSyllabusInput(subject.syllabusFileUrl); setShowSyllabusEdit(true) }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><Pencil size={11} /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setSyllabusInput(''); setShowSyllabusEdit(true) }} className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">+ Add link</button>
-                    )
+                    <div className="flex items-center justify-end gap-2">
+                      {subject?.syllabusFileUrl ? (
+                        <>
+                          <a href={subject.syllabusFileUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium py-1">View PDF</a>
+                          <button onClick={handleDeleteSyllabus} disabled={deleteSyllabusMutation.isPending} className="text-red-500 hover:text-red-700 p-1 rounded-md transition-colors disabled:opacity-50" title="Delete Syllabus">
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      ) : (
+                        <label className="cursor-pointer text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">
+                          {uploadSyllabusMutation.isPending ? 'Uploading...' : '+ Upload PDF'}
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            className="hidden"
+                            onChange={handleUploadSyllabus}
+                            disabled={uploadSyllabusMutation.isPending}
+                          />
+                        </label>
+                      )}
+                    </div>
                   }
                 />
 
@@ -685,6 +682,7 @@ export default function SubjectDetailPage() {
             </div>
           </div>
         </Modal>
+        
       </div>
     </div>
   )
