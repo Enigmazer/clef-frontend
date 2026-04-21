@@ -17,6 +17,9 @@ import {
   deleteSubject,
   joinSubject,
   listEnrolledStudents,
+  parseSyllabus,
+  getSyllabusUrl,
+  getTeacherProfile,
 } from '../api/subjects'
 
 // ─── Teacher subject queries ──────────────────────────────────────────────────
@@ -63,6 +66,24 @@ export function useStudentSubjectDetail(id) {
     queryKey: ['subjects', id, 'student'],
     queryFn: () => getStudentSubjectDetails(id),
     enabled: !!id,
+  })
+}
+
+// ─── Shared queries ──────────────────────────────────────────────────────────
+export function useSyllabusUrl(id, enabled = true) {
+  return useQuery({
+    queryKey: ['subjects', id, 'syllabus'],
+    queryFn: () => getSyllabusUrl(id),
+    enabled: !!id && enabled,
+    retry: false, // Don't retry if it returns an error (e.g., 404 meaning no syllabus)
+  })
+}
+
+export function useTeacherProfile(id, enabled = true) {
+  return useQuery({
+    queryKey: ['subjects', id, 'teacherProfile'],
+    queryFn: () => getTeacherProfile(id),
+    enabled: !!id && enabled,
   })
 }
 
@@ -121,7 +142,10 @@ export function useUploadSyllabus(subjectId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (file) => uploadSyllabus(subjectId, file),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
+      qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'syllabus'] })
+    },
   })
 }
 
@@ -129,7 +153,10 @@ export function useDeleteSyllabus(subjectId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => deleteSyllabus(subjectId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
+      qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'syllabus'] })
+    },
   })
 }
 
@@ -154,6 +181,13 @@ export function useDeleteSubject() {
   return useMutation({
     mutationFn: deleteSubject,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', 'teacher'] }),
+  })
+}
+
+// ─── Syllabus parsing ─────────────────────────────────────────────────────────
+export function useParseSyllabus(subjectId) {
+  return useMutation({
+    mutationFn: () => parseSyllabus(subjectId),
   })
 }
 

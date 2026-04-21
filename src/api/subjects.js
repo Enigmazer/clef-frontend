@@ -18,6 +18,12 @@ export const getTeacherSubjectDetails = (id) =>
 export const getStudentSubjectDetails = (id) =>
   api.get(`/subjects/${id}/student`).then((res) => res.data)
 
+export const getSyllabusUrl = (id) =>
+  api.get(`/subjects/${id}/syllabus`).then((res) => res.data)
+
+export const getTeacherProfile = (id) =>
+  api.get(`/subjects/${id}/teacher/profile`).then((res) => res.data)
+
 export const joinSubject = (joinCode) =>
   api.post('/subjects/join', { joinCode }).then((res) => res.data)
 
@@ -55,3 +61,6 @@ export const bulkAddUnits = (id, units) =>
 
 export const listEnrolledStudents = (id) =>
   api.get(`/subjects/${id}/enrolled/students`).then((res) => res.data)
+
+export const parseSyllabus = (id) =>
+  api.get(`/subjects/${id}/parse`).then((res) => res.data)

@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronDown, ChevronRight, Copy, Check,
   Lock, LockOpen, Layers, Archive, ArchiveRestore,
   CircleDot, Circle, CheckCircle2, AlertCircle, Settings,
-  Pencil, Trash2, X, Save, CirclePlay, SkipForward, Plus,
+  Pencil, Trash2, X, Save, CirclePlay, SkipForward, Plus, Sparkles,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
@@ -12,117 +12,33 @@ import {
   useTeacherSubjectDetail, useEnrolledStudents,
   useLockUnlockSubject, useArchiveUnarchiveSubject,
   useUpdateSubject, useUploadSyllabus, useDeleteSyllabus, useSetCurrentTopic,
-  useSetNextTopic, useDeleteSubject,
+  useSetNextTopic, useDeleteSubject
 } from '../hooks/useSubjects'
+import { getSyllabusUrl } from '../api/subjects'
 import { useToggleTopicComplete } from '../hooks/useTopics'
 import TopicMaterialPill from '../components/TopicMaterialPill'
 import ConfirmModal from '../components/ConfirmModal'
 import { UnitAccordion } from '../components/CurriculumAccordion'
+import { formatDate, getErrorMsg } from '../components/subject/helpers'
+import JoinCodePill from '../components/subject/JoinCodePill'
+import SettingRow from '../components/subject/SettingRow'
+import TopicPickerModal from '../components/subject/TopicPickerModal'
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-function formatDate(instant) {
-  if (!instant) return '—'
-  return new Date(instant).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function getErrorMsg(err) {
-  return err?.response?.data?.message ?? 'Something went wrong.'
-}
-
-// ─── Join code copy pill ───────────────────────────────────────────────────────
-function JoinCodePill({ code }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-  return (
-    <button
-      onClick={copy}
-      className="flex items-center gap-2 bg-green-50 dark:bg-[#052e16] border border-green-200 dark:border-green-900/50 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-lg text-sm font-mono font-semibold hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors group"
-    >
-      <span className="tracking-widest">{code}</span>
-      {copied
-        ? <Check size={13} className="text-green-500" />
-        : <Copy size={12} className="opacity-50 group-hover:opacity-100 transition-opacity" />}
-    </button>
-  )
-}
-
-// ─── Setting row ──────────────────────────────────────────────────────────────
-function SettingRow({ title, description, action }) {
-  return (
-    <div className="flex items-center justify-between py-4 border-b border-gray-100 dark:border-[#2a2a2a] last:border-0">
-      <div className="pr-4">
-        <p className="text-sm font-medium text-gray-900 dark:text-white">{title}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 max-w-[200px] sm:max-w-none">{description}</p>
-      </div>
-      <div className="shrink-0">{action}</div>
-    </div>
-  )
-}
-
-// ─── Topic picker modal ────────────────────────────────────────────────────────
-function TopicPickerModal({ isOpen, onClose, units, mode, onPick, currentId, nextId }) {
-  const otherId = mode === 'current' ? nextId : currentId
-
-  const filteredUnits = units.map(unit => ({
-    ...unit,
-    topics: unit.topics.filter(t =>
-      !t.completedAt && (t.id !== otherId || t.id === (mode === 'current' ? currentId : nextId))
-    )
-  })).filter(unit => unit.topics.length > 0)
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={mode === 'current' ? 'Set current topic' : 'Set next topic'}
-    >
-      <div className="space-y-1 max-h-80 overflow-y-auto pt-1 pr-1">
-        {filteredUnits.length === 0 ? (
-          <div className="py-8 text-center">
-            <CheckCircle2 size={32} className="text-green-500 mx-auto mb-2 opacity-20" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">No available topics to set.</p>
-          </div>
-        ) : (
-          filteredUnits.map(unit => (
-            <div key={unit.id} className="pb-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-1 py-2 opacity-70">{unit.title}</p>
-              {unit.topics.map(topic => {
-                const isSelected = mode === 'current' ? topic.id === currentId : topic.id === nextId
-                return (
-                  <button
-                    key={topic.id}
-                    onClick={() => { onPick(topic, unit); onClose() }}
-                    className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${isSelected
-                      ? 'bg-green-50 dark:bg-[#052e16] text-green-700 dark:text-green-400 font-medium'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#1e1e1e]'
-                      }`}
-                  >
-                    {isSelected
-                      ? <Check size={14} className="text-green-500 shrink-0" />
-                      : <Circle size={14} className="text-gray-300 dark:text-gray-600 shrink-0" />}
-                    <span className="truncate">{topic.title}</span>
-                  </button>
-                )
-              })}
-            </div>
-          ))
-        )}
-      </div>
-    </Modal>
-  )
-}
-
-// ─── Main page ─────────────────────────────────────────────────────────────────
 export default function SubjectDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const subjectId = Number(id)
   const { data: subject, isLoading, isError } = useTeacherSubjectDetail(subjectId)
   const { data: students = [], isLoading: studentsLoading } = useEnrolledStudents(subjectId)
+
+  // Edit mode
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+
+  // Modals & Overlays
+  const [showSettings, setShowSettings] = useState(false)
+  const [isFetchingSyllabus, setIsFetchingSyllabus] = useState(false)
 
   const lockMutation = useLockUnlockSubject(subjectId)
   const archiveMutation = useArchiveUnarchiveSubject(subjectId)
@@ -134,17 +50,9 @@ export default function SubjectDetailPage() {
   const deleteMutation = useDeleteSubject()
   const toggleCompleteMutation = useToggleTopicComplete(subjectId)
 
-  // Edit mode
-  const [editName, setEditName] = useState('')
-  const [editDesc, setEditDesc] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
-
-  // Syllabus variables no longer needed as we upload file directly
-
-  // Modals & Overlays
-  const [showSettings, setShowSettings] = useState(false)
   const [topicPicker, setTopicPicker] = useState(null) // 'current' | 'next' | null
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showSyllabusDeleteConfirm, setShowSyllabusDeleteConfirm] = useState(false)
   const [showStudents, setShowStudents] = useState(false)
 
   // Inline errors
@@ -204,8 +112,8 @@ export default function SubjectDetailPage() {
       setActionError('Only PDF files are supported.')
       return
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setActionError('File size must be 10MB or less.')
+    if (file.size > 2 * 1024 * 1024) {
+      setActionError('File size must be 2MB or less.')
       return
     }
 
@@ -218,13 +126,35 @@ export default function SubjectDetailPage() {
     e.target.value = null // reset
   }
 
-  const handleDeleteSyllabus = async () => {
-    if (!window.confirm("Are you sure you want to delete the syllabus?")) return;
+  const handleDeleteSyllabus = () => {
+    setShowSyllabusDeleteConfirm(true)
+  }
+
+  const handleConfirmDeleteSyllabus = async () => {
     setActionError('')
     try {
       await deleteSyllabusMutation.mutateAsync()
+      setShowSyllabusDeleteConfirm(false)
     } catch (err) {
       setActionError(getErrorMsg(err))
+      setShowSyllabusDeleteConfirm(false)
+    }
+  }
+
+  const handleViewSyllabus = async () => {
+    setActionError('')
+    setIsFetchingSyllabus(true)
+    try {
+      const res = await getSyllabusUrl(subjectId)
+      if (res?.syllabusUrl) {
+        window.open(res.syllabusUrl, '_blank', 'noopener,noreferrer')
+      } else {
+        setActionError('Syllabus URL not found.')
+      }
+    } catch (err) {
+      setActionError(getErrorMsg(err))
+    } finally {
+      setIsFetchingSyllabus(false)
     }
   }
 
@@ -483,8 +413,28 @@ export default function SubjectDetailPage() {
               </div>
               {(!subject.units || subject.units.length === 0) ? (
                 <div className="bg-white dark:bg-[#1a1a1a] border border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl px-6 py-8 text-center">
-                  <Layers size={24} className="text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">No units added yet</p>
+                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Sparkles size={22} className="text-green-500 dark:text-green-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">No units added yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Auto-populate from your syllabus PDF, or add units manually.</p>
+                  {!subject.archived && (
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <button
+                        onClick={() => navigate(`/subjects/${id}/units`, { state: { openParseModal: true } })}
+                        className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+                      >
+                        <Sparkles size={13} />
+                        Get syllabus from PDF
+                      </button>
+                      <button
+                        onClick={() => navigate(`/subjects/${id}/units`)}
+                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      >
+                        Or add manually →
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3 pt-1">
@@ -565,12 +515,18 @@ export default function SubjectDetailPage() {
 
                 <SettingRow
                   title="Syllabus"
-                  description="Upload a syllabus PDF file (Max 10MB)."
+                  description="Upload a syllabus PDF file (Max 2MB)."
                   action={
                     <div className="flex items-center justify-end gap-2">
-                      {subject?.syllabusFileUrl ? (
+                       {subject?.isSyllabusPdfAvailable ? (
                         <>
-                          <a href={subject.syllabusFileUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium py-1">View PDF</a>
+                          <button 
+                            onClick={handleViewSyllabus} 
+                            disabled={isFetchingSyllabus}
+                            className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium py-1 disabled:opacity-50"
+                          >
+                            {isFetchingSyllabus ? 'Opening...' : 'View Syllabus PDF'}
+                          </button>
                           <button onClick={handleDeleteSyllabus} disabled={deleteSyllabusMutation.isPending} className="text-red-500 hover:text-red-700 p-1 rounded-md transition-colors disabled:opacity-50" title="Delete Syllabus">
                             <Trash2 size={13} />
                           </button>
@@ -682,6 +638,17 @@ export default function SubjectDetailPage() {
             </div>
           </div>
         </Modal>
+
+        {/* Syllabus delete confirm modal */}
+        <ConfirmModal
+          isOpen={showSyllabusDeleteConfirm}
+          onClose={() => setShowSyllabusDeleteConfirm(false)}
+          onConfirm={handleConfirmDeleteSyllabus}
+          title="Delete Syllabus"
+          message="Are you sure you want to delete the syllabus PDF? This action cannot be undone."
+          confirmText="Delete Syllabus"
+          loading={deleteSyllabusMutation.isPending}
+        />
         
       </div>
     </div>

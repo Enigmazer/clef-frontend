@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ChevronLeft, Layers, CheckCircle2, AlertCircle, Link2, Phone
+  ChevronLeft, Layers, CheckCircle2, AlertCircle, Link2, Phone, Info
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
-import { useStudentSubjectDetail } from '../hooks/useSubjects'
+import Modal from '../components/Modal'
+import { useStudentSubjectDetail, useTeacherProfile } from '../hooks/useSubjects'
+import { getSyllabusUrl } from '../api/subjects'
 import { UnitAccordion } from '../components/CurriculumAccordion'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -20,6 +23,24 @@ export default function StudentSubjectDetailPage() {
   
   // Directly hit the student's read-only endpoint
   const { data: subject, isLoading, isError } = useStudentSubjectDetail(subjectId)
+
+  const [showInfo, setShowInfo] = useState(false)
+  const [isFetchingSyllabus, setIsFetchingSyllabus] = useState(false)
+  const { data: teacherProfile, isLoading: isTeacherLoading } = useTeacherProfile(subjectId, showInfo)
+
+  const handleViewSyllabus = async () => {
+    setIsFetchingSyllabus(true)
+    try {
+      const res = await getSyllabusUrl(subjectId)
+      if (res?.syllabusUrl) {
+        window.open(res.syllabusUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err) {
+      console.error('Failed to load syllabus', err)
+    } finally {
+      setIsFetchingSyllabus(false)
+    }
+  }
 
   const currentTopicId = subject?.currentTopic?.id ?? null
   const nextTopicId    = subject?.nextTopic?.id ?? null
@@ -69,38 +90,15 @@ export default function StudentSubjectDetailPage() {
                 {subject.description && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">{subject.description}</p>
                 )}
-                {subject.syllabusFileUrl && (
-                  <div className="mt-4">
-                    <a href={subject.syllabusFileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:text-green-700 transition-colors">
-                      <Link2 size={15} />
-                      View Syllabus
-                    </a>
-                  </div>
-                )}
               </div>
-            </div>
-
-            {/* Instructor Card */}
-            <div className="flex items-center gap-4 p-4 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl w-full sm:w-fit mt-2">
-              <img
-                src={subject.teacherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(subject.teacherName || 'Teacher')}&background=random&color=fff`}
-                alt="Teacher avatar"
-                className="w-12 h-12 rounded-full object-cover shrink-0"
-                onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(subject.teacherName || 'T')}&background=6ee7b7&color=065f46` }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-0.5">Instructor</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{subject.teacherName}</p>
-                {subject.teacherPhoneNumbers?.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                    {subject.teacherPhoneNumbers.map((phone, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <Phone size={11} className="text-gray-400" />
-                        {phone.phoneNumber}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="shrink-0 pt-1">
+                <button
+                  onClick={() => setShowInfo(true)}
+                  className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#222] border border-gray-200 dark:border-[#2a2a2a] rounded-xl transition-colors shadow-sm"
+                  aria-label="Subject Information"
+                >
+                  <Info size={18} />
+                </button>
               </div>
             </div>
 
@@ -185,6 +183,79 @@ export default function StudentSubjectDetailPage() {
 
           </div>
         )}
+
+        {/* Modal for Subject Information (Syllabus & Teacher Profile) */}
+        <Modal isOpen={showInfo} onClose={() => setShowInfo(false)} title="Subject Information">
+          <div className="pt-2 flex flex-col">
+            {/* Instructor Section */}
+            <div className="py-3 border-b border-gray-100 dark:border-[#2a2a2a]">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Instructor</h3>
+              {isTeacherLoading ? (
+                <div className="flex items-center gap-3 animate-pulse">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-[#2a2a2a]"></div>
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 bg-gray-200 dark:bg-[#2a2a2a] rounded w-1/3"></div>
+                    <div className="h-3 bg-gray-100 dark:bg-[#222] rounded w-1/4"></div>
+                  </div>
+                </div>
+              ) : teacherProfile ? (
+                <div className="flex items-start gap-4">
+                  <img
+                    src={teacherProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherProfile.fullName || 'Teacher')}&background=random&color=fff`}
+                    alt="Teacher avatar"
+                    className="w-12 h-12 rounded-full object-cover shrink-0"
+                    onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherProfile.fullName || 'T')}&background=6ee7b7&color=065f46` }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{teacherProfile.fullName || 'Tutor'}</p>
+                    {teacherProfile.phoneNumbers?.length > 0 ? (
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        {teacherProfile.phoneNumbers.map((phone, idx) => (
+                          <a key={idx} href={`tel:${phone.phoneNumber}`} className="inline-flex items-center gap-2 text-sm text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 transition-colors">
+                            <Phone size={13} />
+                            {phone.phoneNumber}
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">No contact information available</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic">Instructor details not found.</p>
+              )}
+            </div>
+
+            {/* Syllabus Section */}
+            <div className="py-4">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Subject Syllabus</h3>
+              {subject?.isSyllabusPdfAvailable ? (
+                <button 
+                  onClick={handleViewSyllabus}
+                  disabled={isFetchingSyllabus}
+                  className="w-full inline-flex items-center justify-between p-3 bg-gray-50 dark:bg-[#111] hover:bg-gray-100 dark:hover:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl transition-colors group mt-1 disabled:opacity-50 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center">
+                      <Link2 size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {isFetchingSyllabus ? 'Opening...' : 'View Syllabus PDF'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PDF Document</p>
+                    </div>
+                  </div>
+                  <ChevronLeft size={16} className="text-gray-400 -scale-x-100 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+                </button>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-1">No syllabus has been uploaded for this subject yet.</p>
+              )}
+            </div>
+          </div>
+        </Modal>
+
       </div>
     </div>
   )

@@ -1,592 +1,40 @@
-import { useState, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import {
-  ChevronLeft, Plus, Trash2, ChevronDown, ChevronRight,
-  Layers, BookOpen, AlertCircle, CheckCircle2, X, Edit2, Save
-} from 'lucide-react'
+import { useState, useEffect, startTransition } from 'react'
+import { useNavigate, useParams, useLocation, useBlocker } from 'react-router-dom'
+import { ChevronLeft, Plus, AlertCircle, CheckCircle2, X, Sparkles, ArrowRight } from 'lucide-react'
 import Navbar from '../components/Navbar'
-import Modal from '../components/Modal'
 import { useTeacherSubjectDetail, useBulkAddUnits } from '../hooks/useSubjects'
-import { useUpdateUnit, useDeleteUnit } from '../hooks/useUnits'
-import { useUpdateTopics, useDeleteTopics, useDeleteTopicMaterials, useUploadTopicMaterial } from '../hooks/useTopics'
-import TopicMaterialPill from '../components/TopicMaterialPill'
-import ConfirmModal from '../components/ConfirmModal'
+import { buildDefaultUnits } from '../components/units/DefaultUnitsBuilder'
+import ExistingUnitRow from '../components/units/ExistingUnitRow'
+import DraftUnitEditor from '../components/units/DraftUnitEditor'
+import HowManyModal from '../components/units/HowManyModal'
+import ParseSyllabusModal from '../components/units/ParseSyllabusModal'
 
-function buildDefaultUnits(count, existingCount) {
-  return Array.from({ length: count }, (_, i) => {
-    const unitNum = existingCount + i + 1
-    return {
-      _unitNum: unitNum,
-      title: `Unit ${unitNum} - `,
-      topics: [{ title: '' }],
-    }
-  })
-}
-
-// ─── Upload Content Modal ──────────────────────────────────────────────────────
-function UploadContentModal({ isOpen, onClose, unit, uploadMaterialMutation }) {
-  const fileInputRef = useRef(null)
-  const [selectedTopicId, setSelectedTopicId] = useState(null)
-
-  const handleTopicClick = (topicId) => {
-    setSelectedTopicId(topicId)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    setTimeout(() => {
-      fileInputRef.current?.click()
-    }, 50)
-  }
-
-  const handleFileChange = async (e) => {
-     const file = e.target.files?.[0]
-     if (!file || !selectedTopicId) return
-
-     const allowedTypes = [
-       "audio/mpeg", "audio/mp4", "video/mp4", "video/x-matroska",
-       "application/pdf", "image/jpeg", "image/png", "application/msword",
-       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-     ];
-
-     if (!allowedTypes.includes(file.type)) {
-       alert("Unsupported file type. Please upload a valid document, image, or media file.");
-       e.target.value = null;
-       return;
-     }
-
-     if (file.size > 50 * 1024 * 1024) {
-       alert("File size must be 50MB or less.");
-       e.target.value = null;
-       return;
-     }
-
-     try {
-       onClose()
-       await uploadMaterialMutation.mutateAsync({ unitId: unit.id, topicId: selectedTopicId, file })
-     } catch(err) {
-       console.error(err)
-       alert(err?.response?.data?.message || 'Failed to upload material')
-     }
-     e.target.value = null
-  }
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Add Content to ${unit.title}`}>
-      <div className="pt-2 pb-4">
-         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 px-2">Select a topic to upload your material to:</p>
-         
-         <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="audio/mpeg,audio/mp4,video/mp4,video/x-matroska,application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-
-          <div className="space-y-2 px-1 max-h-[60vh] overflow-y-auto">
-            {unit.topics.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No topics available in this unit.</p>
-            ) : (
-              unit.topics.map(topic => (
-                <button
-                  key={topic.id}
-                  onClick={() => handleTopicClick(topic.id)}
-                  className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 dark:bg-[#1a1a1a] dark:hover:bg-[#222] border border-gray-100 dark:border-[#2a2a2a] rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
-                >
-                  {topic.title}
-                </button>
-              ))
-            )}
-          </div>
-       </div>
-    </Modal>
-  )
-}
-
-// ─── Existing unit viewer and editor ──────────────────────────────────────────
-
-function ExistingUnitRow({ subjectId, unit }) {
-  const [open, setOpen] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  
-  const { mutateAsync: updateUnit, isPending: isUpdating } = useUpdateUnit(subjectId)
-  const { mutateAsync: deleteUnit, isPending: isDeleting } = useDeleteUnit(subjectId)
-  const { mutateAsync: updateTopics } = useUpdateTopics(subjectId)
-  const { mutateAsync: deleteTopics } = useDeleteTopics(subjectId)
-  const deleteMaterialMutation = useDeleteTopicMaterials(subjectId)
-  const uploadMaterialMutation = useUploadTopicMaterial(subjectId)
-
-  // Material selection state
-  const [selectedMaterials, setSelectedMaterials] = useState({})
-  
-  // Unit edit state
-  const [editTitle, setEditTitle] = useState(unit.title)
-  const [oldTopics, setOldTopics] = useState([])
-  const [newTopics, setNewTopics] = useState([])
-  const [unitError, setUnitError] = useState('')
-
-  // Confirm states
-  const [confirmUnitDeleteOpen, setConfirmUnitDeleteOpen] = useState(false)
-  const [topicToDeleteIndex, setTopicToDeleteIndex] = useState(null)
-  const [isConfirmingSaveDeletions, setIsConfirmingSaveDeletions] = useState(false)
-
-  const materialsToDeleteCount = Object.values(selectedMaterials).flat().length
-
-  const handleEditClick = () => {
-    setEditTitle(unit.title)
-    setOldTopics(unit.topics.map(t => ({ ...t })))
-    setNewTopics([])
-    setUnitError('')
-    setIsEditing(true)
-  }
-
-  const handleUnitDelete = async (e) => {
-    e.stopPropagation()
-    setConfirmUnitDeleteOpen(true)
-  }
-
-  const confirmUnitDeletion = async () => {
-    try {
-      await deleteUnit(unit.id)
-      setConfirmUnitDeleteOpen(false)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const handleUnitSave = async () => {
-    if (!editTitle.trim()) {
-      setUnitError('Unit title cannot be empty.')
-      return
-    }
-    
-    for (const t of oldTopics) {
-      if (!t.title.trim()) {
-        setUnitError('Topic titles cannot be empty.')
-        return
-      }
-    }
-
-    const changedOldTopics = oldTopics.filter(ot => {
-       const original = unit.topics.find(ut => ut.id === ot.id)
-       return original && original.title !== ot.title.trim()
-    }).map(ot => ({ topicId: ot.id, title: ot.title.trim() }))
-    
-    const deletedTopicIds = unit.topics
-      .map(ut => ut.id)
-      .filter(id => !oldTopics.some(ot => ot.id === id))
-    
-    const cleanNewTopics = newTopics.filter(t => t.title.trim())
-    
-    if (materialsToDeleteCount > 0 && !isConfirmingSaveDeletions) {
-       setIsConfirmingSaveDeletions(true)
-       return
-    }
-
-    try {
-      setUnitError('')
-      const promises = []
-      
-      if (changedOldTopics.length > 0) {
-        promises.push(updateTopics({ unitId: unit.id, topics: changedOldTopics }))
-      }
-      
-      if (deletedTopicIds.length > 0) {
-        promises.push(deleteTopics({ unitId: unit.id, topicIds: deletedTopicIds }))
-      }
-
-      // Add material deletions (skipping topics that are already entirely deleted)
-      Object.entries(selectedMaterials).forEach(([topicId, matIds]) => {
-         if (matIds.length > 0 && !deletedTopicIds.includes(topicId)) {
-            promises.push(deleteMaterialMutation.mutateAsync({ unitId: unit.id, topicId, materialIds: matIds }))
-         }
-      })
-      
-      promises.push(updateUnit({
-        unitId: unit.id,
-        data: {
-          title: editTitle.trim(),
-          topics: cleanNewTopics.map(t => ({ title: t.title.trim() }))
-        }
-      }))
-      
-      await Promise.all(promises)
-      
-      setIsConfirmingSaveDeletions(false)
-      setSelectedMaterials({})
-      setIsEditing(false)
-      setNewTopics([])
-    } catch (err) {
-      setUnitError(err?.response?.data?.message || 'Failed to update unit.')
-    }
-  }
-
-  if (isEditing) {
-    return (
-      <div className="border border-green-200 dark:border-green-900/60 bg-white dark:bg-[#1a1a1a] rounded-xl overflow-hidden animate-fade-in shadow-sm my-3">
-        {/* Editor header */}
-        <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-[#052e16]/40 border-b border-green-200 dark:border-green-900/60">
-          <Layers size={14} className="text-green-500 shrink-0" />
-          <input
-            type="text"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            placeholder="Unit title"
-            className="flex-1 bg-white dark:bg-[#111] border border-green-200 dark:border-green-900/60 rounded-lg px-2 py-1 text-sm font-semibold text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500"
-            autoFocus
-          />
-          <button
-            onClick={() => {
-              setIsEditing(false)
-              setEditTitle(unit.title)
-              setNewTopics([])
-              setUnitError('')
-            }}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-2 py-1 text-xs font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUnitSave}
-            disabled={isUpdating}
-            className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save size={12} />
-            {isUpdating ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-
-        {unitError && (
-          <div className="px-4 py-2 bg-red-50 text-red-600 text-xs flex items-center gap-1 border-b border-red-100">
-             <AlertCircle size={12} /> {unitError}
-          </div>
-        )}
-
-        <div className="px-4 py-3 space-y-2">
-          {/* Old Topics (Editable inline with topic controller) */}
-          {oldTopics.map((t, idx) => (
-            <div key={t.id} className="flex flex-col gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <BookOpen size={12} className="text-gray-400 shrink-0 ml-4" />
-                <input
-                  type="text"
-                  value={t.title}
-                  onChange={(e) => {
-                    const arr = [...oldTopics]
-                    arr[idx].title = e.target.value
-                    setOldTopics(arr)
-                  }}
-                  placeholder="Topic title"
-                  className="flex-1 bg-white dark:bg-[#111] border border-gray-200 dark:border-[#333] focus:border-green-200 dark:focus:border-green-800 rounded-lg px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-green-500 transition-shadow"
-                />
-                <button
-                  onClick={() => {
-                     const original = unit.topics.find(ut => ut.id === t.id);
-                     if (original && original.topicMaterials && original.topicMaterials.length > 0) {
-                        setTopicToDeleteIndex(idx);
-                     } else {
-                        setOldTopics(oldTopics.filter((_, i) => i !== idx));
-                     }
-                  }}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-
-              {t.topicMaterials && t.topicMaterials.length > 0 && (
-                <div className="pl-9 pr-8">
-                  <div className="flex items-center justify-between mb-1.5 mt-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                      Materials <span className="normal-case font-medium ml-1 text-gray-300 dark:text-gray-600">(Select to delete)</span>
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {t.topicMaterials.map(mat => (
-                      <TopicMaterialPill
-                        key={mat.id}
-                        subjectId={subjectId}
-                        unitId={unit.id}
-                        topicId={t.id}
-                        material={mat}
-                        onSelect={(matId) => {
-                          setSelectedMaterials(prev => {
-                            const arr = prev[t.id] || [];
-                            return { ...prev, [t.id]: arr.includes(matId) ? arr.filter(id => id !== matId) : [...arr, matId] }
-                          })
-                        }}
-                        isSelected={selectedMaterials[t.id]?.includes(mat.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* New Topics (Editable) */}
-          {newTopics.map((nt, idx) => (
-             <div key={idx} className="flex items-center gap-2 animate-fade-in">
-               <BookOpen size={12} className="text-green-500 shrink-0 ml-4" />
-               <input
-                 type="text"
-                 value={nt.title}
-                 onChange={(e) => {
-                   const arr = [...newTopics]
-                   arr[idx].title = e.target.value
-                   setNewTopics(arr)
-                 }}
-                 placeholder="New topic title"
-                 className="flex-1 bg-white dark:bg-[#111] border border-green-200 dark:border-green-900/60 rounded-lg px-3 py-1.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-green-500"
-               />
-               <button
-                 onClick={() => setNewTopics(newTopics.filter((_, i) => i !== idx))}
-                 className="text-gray-400 hover:text-red-500 transition-colors"
-               >
-                 <X size={14} />
-               </button>
-             </div>
-          ))}
-
-          <button
-            onClick={() => setNewTopics([...newTopics, { title: '' }])}
-            className="ml-10 text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors flex items-center gap-1 py-1 mt-1"
-          >
-            <Plus size={11} />
-            Add new topic
-          </button>
-        </div>
-
-        <ConfirmModal
-          isOpen={isConfirmingSaveDeletions}
-          onClose={() => setIsConfirmingSaveDeletions(false)}
-          onConfirm={handleUnitSave}
-          title="Save with Deletions"
-          message={`You have selected ${materialsToDeleteCount} material(s) for deletion. Saving now will permanently remove them. Are you sure?`}
-          confirmText="Save & Delete"
-          loading={isUpdating || deleteMaterialMutation.isPending}
-        />
-
-        <ConfirmModal
-          isOpen={topicToDeleteIndex !== null}
-          onClose={() => setTopicToDeleteIndex(null)}
-          onConfirm={() => {
-             setOldTopics(oldTopics.filter((_, i) => i !== topicToDeleteIndex))
-             setTopicToDeleteIndex(null)
-          }}
-          title="Remove Topic"
-          message="This topic contains materials. Removing it will permanently delete all of its materials when you save. This action cannot be undone."
-          confirmText="Remove"
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="border border-gray-200 dark:border-[#2a2a2a] rounded-xl overflow-hidden group">
-      <div className="w-full flex items-stretch justify-between bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors">
-        <button
-          onClick={() => setOpen(o => !o)}
-          className="flex-1 flex items-center gap-3 px-4 py-3.5 text-left outline-none"
-        >
-          <Layers size={15} className="text-green-500 shrink-0" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">{unit.title}</span>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {unit.topics.length} topic{unit.topics.length !== 1 ? 's' : ''}
-          </span>
-        </button>
-        <div className="flex items-center gap-2 pr-4 py-3.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); setUploadModalOpen(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
-          >
-            <Plus size={13} />
-            Add Content
-          </button>
-          <button
-            onClick={handleEditClick}
-            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50 ml-1"
-            title="Edit Unit"
-          >
-            <Edit2 size={14} />
-          </button>
-          <button
-            onClick={handleUnitDelete}
-            className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
-            title="Delete Unit"
-          >
-            <Trash2 size={14} />
-          </button>
-          <button onClick={() => setOpen(o => !o)} className="ml-1 p-1 outline-none text-gray-400">
-            {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-          </button>
-        </div>
-      </div>
-      {open && (
-        <div className="divide-y divide-gray-100 dark:divide-[#2a2a2a] bg-gray-50 dark:bg-[#111] animate-fade-in">
-          {unit.topics.length === 0 && (
-             <div className="px-10 py-3 text-xs text-gray-400 italic">No topics in this unit.</div>
-          )}
-          {unit.topics.map(t => (
-            <div key={t.id} className="flex flex-col px-10 py-3 hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors border-b border-gray-100 dark:border-[#2a2a2a] last:border-0 border-opacity-50">
-              <div className="flex items-center gap-3">
-                <BookOpen size={12} className="text-gray-400 shrink-0" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.title}</span>
-              </div>
-              
-              {t.topicMaterials && t.topicMaterials.length > 0 && (
-                <div className="flex flex-col gap-1.5 mt-2 pl-6">
-                  {t.topicMaterials.map(mat => (
-                    <TopicMaterialPill
-                      key={mat.id}
-                      subjectId={subjectId}
-                      unitId={unit.id}
-                      topicId={t.id}
-                      material={mat}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <UploadContentModal 
-        isOpen={uploadModalOpen} 
-        onClose={() => setUploadModalOpen(false)} 
-        unit={unit} 
-        uploadMaterialMutation={uploadMaterialMutation} 
-      />
-      <ConfirmModal
-        isOpen={confirmUnitDeleteOpen}
-        onClose={() => setConfirmUnitDeleteOpen(false)}
-        onConfirm={confirmUnitDeletion}
-        title="Delete Unit"
-        message="Are you sure you want to delete this unit? All topics and their associated materials will be permanently deleted. This action cannot be undone."
-        confirmText="Delete"
-        loading={isDeleting}
-      />
-    </div>
-  )
-}
-
-// ─── Draft unit editor ────────────────────────────────────────────────────────
-function DraftUnitEditor({ unit, onChange, onRemove }) {
-  const updateTitle = (val) => onChange({ ...unit, title: val })
-  const updateTopic = (ti, val) => {
-    const topics = unit.topics.map((t, idx) => idx === ti ? { title: val } : t)
-    onChange({ ...unit, topics })
-  }
-  const addTopic = () => {
-    onChange({ ...unit, topics: [...unit.topics, { title: '' }] })
-  }
-  const removeTopic = (ti) => onChange({ ...unit, topics: unit.topics.filter((_, idx) => idx !== ti) })
-
-  return (
-    <div className="border border-green-200 dark:border-green-900/60 bg-white dark:bg-[#1a1a1a] rounded-xl overflow-hidden">
-      {/* Unit header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-[#052e16]/40 border-b border-green-200 dark:border-green-900/60">
-        <Layers size={14} className="text-green-500 shrink-0" />
-        <input
-          type="text"
-          value={unit.title}
-          onChange={(e) => updateTitle(e.target.value)}
-          placeholder="Unit title"
-          className="flex-1 bg-transparent text-sm font-semibold text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none"
-        />
-        <button
-          onClick={onRemove}
-          className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 rounded-lg"
-          title="Remove unit"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      {/* Topics */}
-      <div className="px-4 py-2 space-y-1.5">
-        {unit.topics.map((topic, ti) => (
-          <div key={ti} className="flex items-center gap-2">
-            <BookOpen size={12} className="text-gray-400 shrink-0 ml-4" />
-            <input
-              type="text"
-              value={topic.title}
-              onChange={(e) => updateTopic(ti, e.target.value)}
-              placeholder="Topic title"
-              className="flex-1 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
-            />
-            {unit.topics.length > 1 && (
-              <button
-                onClick={() => removeTopic(ti)}
-                className="text-gray-300 hover:text-red-400 dark:text-gray-600 dark:hover:text-red-500 transition-colors"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-        ))}
-        <button
-          onClick={addTopic}
-          className="ml-10 text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors flex items-center gap-1 py-1"
-        >
-          <Plus size={11} />
-          Add topic
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── How many units modal ─────────────────────────────────────────────────────
-function HowManyModal({ isOpen, onClose, onConfirm, existingCount }) {
-  const [count, setCount] = useState(1)
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add units">
-      <div className="space-y-4 pt-1">
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          How many units do you want to add? We'll pre-fill the titles for you — you can edit them before saving.
-        </p>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setCount(c => Math.max(1, c - 1))}
-            className="w-9 h-9 flex items-center justify-center border border-gray-300 dark:border-[#2a2a2a] rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors text-lg font-bold"
-          >
-            −
-          </button>
-          <span className="text-2xl font-bold text-gray-900 dark:text-white w-8 text-center">{count}</span>
-          <button
-            onClick={() => setCount(c => Math.min(10, c + 1))}
-            className="w-9 h-9 flex items-center justify-center border border-gray-300 dark:border-[#2a2a2a] rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors text-lg font-bold"
-          >
-            +
-          </button>
-          <span className="text-sm text-gray-400 dark:text-gray-500 ml-1">
-            unit{count !== 1 ? 's' : ''} starting from Unit {existingCount + 1}
-          </span>
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-xl transition-colors font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { onConfirm(count); onClose() }}
-            className="flex-1 px-4 py-2.5 text-sm text-white bg-green-500 hover:bg-green-600 rounded-xl transition-colors font-medium"
-          >
-            Continue
-          </button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function UnitsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { data: subject, isLoading, isError } = useTeacherSubjectDetail(Number(id))
   const { mutateAsync: saveBulk, isPending: isSaving } = useBulkAddUnits(Number(id))
 
   const [drafts, setDrafts] = useState([])
   const [showHowMany, setShowHowMany] = useState(false)
+  const [showParseModal, setShowParseModal] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    if (location.state?.openParseModal) {
+      startTransition(() => setShowParseModal(true))
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const blocker = useBlocker(isSaving)
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      blocker.reset()
+    }
+  }, [blocker])
 
   const existingCount = subject?.units?.length ?? 0
 
@@ -660,8 +108,9 @@ export default function UnitsPage() {
 
         {/* Back */}
         <button
-          onClick={() => navigate(`/subjects/${id}`)}
-          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 inline-flex items-center gap-1 mb-6 transition-colors"
+          onClick={() => !isSaving && navigate(`/subjects/${id}`)}
+          disabled={isSaving}
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 inline-flex items-center gap-1 mb-6 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={16} />
           {subject?.name ?? 'Subject'}
@@ -674,13 +123,22 @@ export default function UnitsPage() {
               Add units and topics to organise your curriculum.
             </p>
           </div>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
-          >
-            <Plus size={15} />
-            Add units
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowParseModal(true)}
+              className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border border-green-200 dark:border-green-800/50 hover:border-green-300 dark:hover:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/40 px-3 py-2 rounded-xl transition-colors"
+            >
+              <Sparkles size={14} />
+              {existingCount > 0 ? 'Import from PDF' : 'Get from PDF'}
+            </button>
+            <button
+              onClick={openAddModal}
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+            >
+              <Plus size={15} />
+              Add units
+            </button>
+          </div>
         </div>
 
         {/* Banners */}
@@ -721,9 +179,29 @@ export default function UnitsPage() {
           <div className="space-y-3 mb-6">
             {subject.units?.length === 0 && drafts.length === 0 && (
               <div className="border border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl px-6 py-10 text-center bg-white dark:bg-[#1a1a1a]">
-                <Layers size={28} className="text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">No units yet</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">Click "Add units" above to get started.</p>
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Sparkles size={22} className="text-green-500 dark:text-green-400" />
+                </div>
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">No units yet</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-5">
+                  Parse your syllabus PDF to auto-populate units, or add them manually.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => setShowParseModal(true)}
+                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors"
+                  >
+                    <Sparkles size={14} />
+                    Get syllabus from PDF
+                  </button>
+                  <button
+                    onClick={openAddModal}
+                    className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    <ArrowRight size={14} />
+                    Or add manually
+                  </button>
+                </div>
               </div>
             )}
             {subject.units?.map(unit => (
@@ -773,6 +251,25 @@ export default function UnitsPage() {
           onConfirm={handleHowManyConfirm}
           existingCount={existingCount + drafts.length}
         />
+
+        {/* Parse syllabus modal */}
+        {subject && (
+          <ParseSyllabusModal
+            isOpen={showParseModal}
+            onClose={() => setShowParseModal(false)}
+            subject={subject}
+            onParsed={(parsedDrafts) => {
+              const base = (subject?.units?.length ?? 0) + drafts.length
+              const numbered = parsedDrafts.map((d, i) => ({
+                ...d,
+                _unitNum: base + i + 1,
+              }))
+              setDrafts(prev => [...prev, ...numbered])
+              setSuccess(`${parsedDrafts.length} unit${parsedDrafts.length !== 1 ? 's' : ''} imported from PDF — review and save below.`)
+              setShowParseModal(false)
+            }}
+          />
+        )}
       </div>
     </div>
   )
