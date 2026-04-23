@@ -36,11 +36,17 @@ export const lockUnlockSubject = (id) =>
 export const archiveUnarchiveSubject = (id) =>
   api.patch(`/subjects/${id}/preferences/archive/toggle`).then((res) => res.data)
 
-export const uploadSyllabus = (id, file) => {
+export const uploadSyllabus = (id, file, onProgress) => {
   const formData = new FormData()
   formData.append('file', file)
   return api.patch(`/subjects/${id}/syllabus`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percentCompleted);
+      }
+    }
   }).then((res) => res.data)
 }
 
@@ -64,3 +70,15 @@ export const listEnrolledStudents = (id) =>
 
 export const parseSyllabus = (id) =>
   api.get(`/subjects/${id}/parse`).then((res) => res.data)
+
+export const createHomework = (id, data) =>
+  api.post(`/subjects/${id}/homework`, data).then((res) => res.data)
+
+export const getHomeworkPage = (id, page = 0, filter = 'upcoming') =>
+  api.get(`/subjects/${id}/homework`, { params: { filter, page } }).then((res) => res.data)
+
+export const updateHomework = (subjectId, homeWorkId, data) =>
+  api.post(`/subjects/${subjectId}/homework/${homeWorkId}`, data).then((res) => res.data)
+
+export const deleteHomework = (subjectId, homeWorkId) =>
+  api.delete(`/subjects/${subjectId}/homework/${homeWorkId}`)

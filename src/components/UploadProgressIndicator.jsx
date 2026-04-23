@@ -39,10 +39,16 @@ export default function UploadProgressIndicator() {
           </div>
 
            {upload.status === 'uploading' && (
-            <div className="h-1.5 w-full bg-gray-100 dark:bg-[#222] rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-500 w-1/3 rounded-full animate-progress-scan" 
-              />
+            <div className="flex items-center gap-3 w-full mt-1">
+              <div className="h-1.5 flex-1 bg-gray-100 dark:bg-[#222] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                  style={{ width: `${upload.progress || 0}%` }}
+                />
+              </div>
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 min-w-[28px] text-right">
+                {Math.round(upload.progress || 0)}%
+              </span>
             </div>
           )}
 

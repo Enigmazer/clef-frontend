@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
+import { ChevronDown, ChevronRight, Layers, BookOpen } from 'lucide-react'
 import TopicMaterialPill from './TopicMaterialPill'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -10,43 +10,50 @@ function formatDate(instant) {
 
 // ─── TopicRow ─────────────────────────────────────────────────────────────────
 // Props:
-//   topic           – topic object
-//   isCurrent       – bool
-//   isNext          – bool
-//   isDone          – bool
-//   subjectId       – number
-//   unitId          – number
-//   isArchived      – bool (teacher only, optional)
-//   onToggleComplete– (unitId, topicId) => void (teacher only, optional)
-function TopicRow({ topic, isCurrent, isNext, isDone, subjectId, unitId, isArchived, onToggleComplete }) {
+//   topic             – topic object
+//   isCurrent         – bool
+//   isNext            – bool
+//   isDone            – bool
+//   isInHomework      – bool  ← topic is part of an active (future-due) homework
+//   subjectId         – number
+//   unitId            – number
+//   isArchived        – bool (teacher only, optional)
+//   onToggleComplete  – (unitId, topicId) => void (teacher only, optional)
+function TopicRow({ topic, isCurrent, isNext, isDone, isInHomework, subjectId, unitId, isArchived, onToggleComplete }) {
   const [materialsOpen, setMaterialsOpen] = useState(false)
   const isTeacher = typeof onToggleComplete === 'function'
 
   return (
-    <div className={`flex flex-col ${
+    <div className={`flex flex-col relative ${
       isCurrent ? 'bg-green-50 dark:bg-[#052e16]/50'
-      : isNext   ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
+      : isNext   ? 'bg-blue-50/50 dark:bg-blue-950/20'
+      : isInHomework ? 'bg-amber-50/60 dark:bg-amber-900/10'
+      : ''
     }`}>
+
       <div
         className="flex items-start gap-4 px-10 py-3 cursor-pointer group/row hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors"
         onClick={() => setMaterialsOpen(o => !o)}
       >
         <div className="flex flex-col flex-1 min-w-0 pr-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
               <span className={`text-sm ${
-                isDone    ? 'text-gray-400 dark:text-gray-500 line-through'
+                isDone      ? 'text-gray-400 dark:text-gray-500 line-through'
                 : isCurrent ? 'text-green-700 dark:text-green-400 font-medium'
+                : isInHomework ? 'text-gray-800 dark:text-gray-200 font-medium'
                 : 'text-gray-700 dark:text-gray-300'
-              }`}>{topic.title}</span>
+              }`}>
+                {topic.title}
+              </span>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {/* Teacher-only: mark complete/incomplete button */}
               {isTeacher && !isArchived && (
                 <div className="opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center pr-3 border-r border-gray-200 dark:border-[#333]">
                   <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(unitId, topic.id) }}
+                    onClick={e => { e.stopPropagation(); onToggleComplete(unitId, topic.id) }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                       isDone
                         ? 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
@@ -58,7 +65,8 @@ function TopicRow({ topic, isCurrent, isNext, isDone, subjectId, unitId, isArchi
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
+              {/* Status badges — priority: Current > Next > HW > Done-date */}
+              <div className="flex items-center gap-1.5">
                 {isCurrent && (
                   <span className="text-[10px] font-bold uppercase tracking-wider bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-md">
                     Current
@@ -69,8 +77,16 @@ function TopicRow({ topic, isCurrent, isNext, isDone, subjectId, unitId, isArchi
                     Next
                   </span>
                 )}
+                {isInHomework && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-500 px-2 py-0.5 rounded-md">
+                    <BookOpen size={9} />
+                    HW
+                  </span>
+                )}
                 {isDone && (
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatDate(topic.completedAt)}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                    {formatDate(topic.completedAt)}
+                  </span>
                 )}
               </div>
 
@@ -83,7 +99,7 @@ function TopicRow({ topic, isCurrent, isNext, isDone, subjectId, unitId, isArchi
           </div>
 
           {materialsOpen && topic.topicMaterials?.length > 0 && (
-            <div className="flex flex-col gap-2 mt-4 mb-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col gap-2 mt-4 mb-2" onClick={e => e.stopPropagation()}>
               {topic.topicMaterials.map(mat => (
                 <TopicMaterialPill
                   key={mat.id}
@@ -103,15 +119,17 @@ function TopicRow({ topic, isCurrent, isNext, isDone, subjectId, unitId, isArchi
 
 // ─── UnitAccordion ────────────────────────────────────────────────────────────
 // Props:
-//   unit            – unit object (with .topics array)
-//   currentTopicId  – number | null
-//   nextTopicId     – number | null
-//   subjectId       – number
-//   isArchived      – bool (teacher only, optional)
-//   onToggleComplete– (unitId, topicId) => void (teacher only, optional)
-export function UnitAccordion({ unit, currentTopicId, nextTopicId, subjectId, isArchived, onToggleComplete }) {
+//   unit              – unit object (with .topics array)
+//   currentTopicId    – number | null
+//   nextTopicId       – number | null
+//   homeworkTopicIds  – Set<number>  topics that have active (future-due) homework
+//   subjectId         – number
+//   isArchived        – bool (teacher only, optional)
+//   onToggleComplete  – (unitId, topicId) => void (teacher only, optional)
+export function UnitAccordion({ unit, currentTopicId, nextTopicId, homeworkTopicIds, subjectId, isArchived, onToggleComplete }) {
   const [open, setOpen] = useState(true)
   const completedCount = unit.topics.filter(t => t.completedAt).length
+  const hwCount = unit.topics.filter(t => homeworkTopicIds?.has(t.id)).length
 
   return (
     <div className="border border-gray-200 dark:border-[#2a2a2a] rounded-xl overflow-hidden mb-3 last:mb-0">
@@ -125,6 +143,14 @@ export function UnitAccordion({ unit, currentTopicId, nextTopicId, subjectId, is
         </button>
 
         <div className="flex items-center gap-3 shrink-0">
+          {/* Homework badge on the unit — only shown when some topics in this unit have homework */}
+          {hwCount > 0 && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-500 px-2 py-0.5 rounded-md">
+              <BookOpen size={9} />
+              {hwCount} HW
+            </span>
+          )}
+
           <button
             onClick={() => setOpen(o => !o)}
             className="flex items-center gap-3 pl-2 border-l border-gray-200 dark:border-[#333] outline-none"
@@ -151,6 +177,7 @@ export function UnitAccordion({ unit, currentTopicId, nextTopicId, subjectId, is
               isCurrent={topic.id === currentTopicId}
               isNext={topic.id === nextTopicId}
               isDone={!!topic.completedAt}
+              isInHomework={homeworkTopicIds?.has(topic.id) ?? false}
               subjectId={subjectId}
               unitId={unit.id}
               isArchived={isArchived}

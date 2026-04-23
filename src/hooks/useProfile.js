@@ -3,6 +3,7 @@ import { getMe, togglePhoneVisibility, toggleStudentSectionVisibility, toggleTea
 import { getPhones, sendOtp as sendPhoneOtp, verifyOtp as verifyPhoneOtp, deletePhone, setPrimaryPhone } from '../api/phone'
 import { password, send2FAOtp, enable2FA, disable2FA } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
+import { useUploads } from '../context/UploadContext'
 
 export function useUserQuery() {
   const { user } = useAuth()
@@ -26,6 +27,7 @@ export function usePhonesQuery() {
 export function useProfileMutations() {
   const queryClient = useQueryClient()
   const { refreshUser } = useAuth()
+  const { startUpload, updateProgress, completeUpload, failUpload } = useUploads()
 
   const invalidateUser = async () => {
     await queryClient.invalidateQueries({ queryKey: ['user', 'me'] })
@@ -96,7 +98,20 @@ export function useProfileMutations() {
     }),
 
     uploadAvatar: useMutation({
-      mutationFn: uploadAvatar,
+      mutationFn: async (file) => {
+        const uploadId = `avatar-${Date.now()}`
+        startUpload(uploadId, file.name || 'Avatar')
+        try {
+          const result = await uploadAvatar(file, (progress) => {
+            updateProgress(uploadId, progress)
+          })
+          completeUpload(uploadId)
+          return result
+        } catch (error) {
+          failUpload(uploadId, error?.response?.data?.message || error.message || 'Upload failed')
+          throw error
+        }
+      },
       onSuccess: invalidateUser,
     }),
 

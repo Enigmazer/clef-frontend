@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ChevronLeft, ChevronDown, ChevronRight, Copy, Check,
-  Lock, LockOpen, Layers, Archive, ArchiveRestore,
-  CircleDot, Circle, CheckCircle2, AlertCircle, Settings,
-  Pencil, Trash2, X, Save, CirclePlay, SkipForward, Plus, Sparkles,
+  ChevronLeft, Lock, LockOpen, Archive, ArchiveRestore,
+  AlertCircle, Settings, Trash2, X, Save, CirclePlay, SkipForward, Sparkles,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
@@ -12,17 +10,17 @@ import {
   useTeacherSubjectDetail, useEnrolledStudents,
   useLockUnlockSubject, useArchiveUnarchiveSubject,
   useUpdateSubject, useUploadSyllabus, useDeleteSyllabus, useSetCurrentTopic,
-  useSetNextTopic, useDeleteSubject
+  useSetNextTopic, useDeleteSubject, useActiveHomeworkTopicIds
 } from '../hooks/useSubjects'
 import { getSyllabusUrl } from '../api/subjects'
 import { useToggleTopicComplete } from '../hooks/useTopics'
-import TopicMaterialPill from '../components/TopicMaterialPill'
 import ConfirmModal from '../components/ConfirmModal'
 import { UnitAccordion } from '../components/CurriculumAccordion'
 import { formatDate, getErrorMsg } from '../components/subject/helpers'
 import JoinCodePill from '../components/subject/JoinCodePill'
 import SettingRow from '../components/subject/SettingRow'
 import TopicPickerModal from '../components/subject/TopicPickerModal'
+import HomeworkTab from '../components/subject/HomeworkTab'
 
 export default function SubjectDetailPage() {
   const { id } = useParams()
@@ -39,6 +37,7 @@ export default function SubjectDetailPage() {
   // Modals & Overlays
   const [showSettings, setShowSettings] = useState(false)
   const [isFetchingSyllabus, setIsFetchingSyllabus] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
 
   const lockMutation = useLockUnlockSubject(subjectId)
   const archiveMutation = useArchiveUnarchiveSubject(subjectId)
@@ -49,6 +48,7 @@ export default function SubjectDetailPage() {
   const nextMutation = useSetNextTopic(subjectId)
   const deleteMutation = useDeleteSubject()
   const toggleCompleteMutation = useToggleTopicComplete(subjectId)
+  const homeworkTopicIds = useActiveHomeworkTopicIds(subjectId)
 
   const [topicPicker, setTopicPicker] = useState(null) // 'current' | 'next' | null
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -282,176 +282,193 @@ export default function SubjectDetailPage() {
               </div>
             )}
 
-            {/* Progress bar */}
-            {totalTopics > 0 && (
-              <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl px-5 py-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
-                  <span className="text-sm font-semibold text-green-600 dark:text-green-400">{progressPct}%</span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 dark:bg-[#2a2a2a] rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
-                </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{completedTopics} of {totalTopics} topics completed</p>
-              </div>
-            )}
-
-            {/* Topic Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Last */}
-              <div className="bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900/40 rounded-xl px-4 py-3.5 flex flex-col justify-center">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 mb-1">Last Taught</p>
-                {lastTopic ? (
-                  <>
-                    <p className="text-sm font-semibold text-violet-800 dark:text-violet-300 line-clamp-1">{lastTopic.title}</p>
-                    <div className="flex items-center gap-1 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
-                      <p className="text-[11px] text-violet-600/70 dark:text-violet-500/70 truncate">{lastTopic.unitTitle}</p>
-                      <span className="text-violet-300 dark:text-violet-700">·</span>
-                      <p className="text-[11px] text-violet-600/70 dark:text-violet-500/70">{formatDate(lastTopic.completedAt)}</p>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-violet-700/50 dark:text-violet-400/50 italic">No last topic</p>
-                )}
-              </div>
-
-              {/* Current */}
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-[#2a2a2a] pt-2">
               <button
-                disabled={subject.archived || subject.units?.length === 0 || (availableForCurrent === 0 && !subject.currentTopic)}
-                onClick={() => setTopicPicker('current')}
-                className={`flex flex-col justify-center text-left px-4 py-3.5 rounded-xl border transition-all relative group
-                  ${subject.currentTopic 
-                    ? 'bg-green-50 dark:bg-[#052e16]/40 border-green-200 dark:border-green-900/40 hover:bg-green-100 dark:hover:bg-[#052e16]/60' 
-                    : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#2a2a2a] hover:border-green-500/50 hover:shadow-md'
-                  }
-                  disabled:opacity-60 disabled:cursor-not-allowed
-                `}
+                onClick={() => setActiveTab('overview')}
+                className={`px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'overview' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest ${
-                    subject.currentTopic ? 'text-green-600 dark:text-green-500' : 'text-gray-400 dark:text-gray-500'
-                  }`}>Currently Teaching</p>
-                  
-                  <div className={`p-1 rounded-full transition-colors ${
-                    subject.currentTopic ? 'bg-green-200/50 dark:bg-green-900/30 text-green-700' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400'
-                  } group-hover:bg-green-500 group-hover:text-white`}>
-                    <CirclePlay size={14} />
-                  </div>
-                </div>
-
-                {subject.currentTopic ? (
-                  <>
-                    <p className="text-sm font-semibold text-green-800 dark:text-green-300 line-clamp-1">{subject.currentTopic.title}</p>
-                    <p className="text-[11px] text-green-600/70 dark:text-green-500/70 mt-0.5 truncate">{subject.currentTopic.unit?.title}</p>
-                  </>
-                ) : (
-                  <div className="flex flex-col">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 italic">
-                      {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
-                    </p>
-                    {!isSyllabusCompleted && (
-                      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Click to select current topic</p>
-                    )}
-                  </div>
-                )}
+                Overview
               </button>
-
-              {/* Next */}
               <button
-                disabled={subject.archived || subject.units?.length === 0 || (availableForNext === 0 && !subject.nextTopic)}
-                onClick={() => setTopicPicker('next')}
-                className={`flex flex-col justify-center text-left px-4 py-3.5 rounded-xl border transition-all relative group
-                  ${subject.nextTopic 
-                    ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-950/40' 
-                    : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#2a2a2a] hover:border-blue-500/50 hover:shadow-md'
-                  }
-                  disabled:opacity-60 disabled:cursor-not-allowed
-                `}
+                onClick={() => setActiveTab('homework')}
+                className={`px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'homework' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest ${
-                    subject.nextTopic ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
-                  }`}>Up Next</p>
-                  
-                  <div className={`p-1 rounded-full transition-colors ${
-                    subject.nextTopic ? 'bg-blue-200/50 dark:bg-blue-900/30 text-blue-700' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400'
-                  } group-hover:bg-blue-500 group-hover:text-white`}>
-                    <SkipForward size={14} />
-                  </div>
-                </div>
-
-                {subject.nextTopic ? (
-                  <>
-                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 line-clamp-1">{subject.nextTopic.title}</p>
-                    <p className="text-[11px] text-blue-600/70 dark:text-blue-500/70 mt-0.5 truncate">{subject.nextTopic.unit?.title}</p>
-                  </>
-                ) : (
-                  <div className="flex flex-col">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 italic">
-                      {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
-                    </p>
-                    {!isSyllabusCompleted && (
-                      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Click to select next topic</p>
-                    )}
-                  </div>
-                )}
+                Homework
               </button>
             </div>
 
-            {/* Curriculum */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Curriculum</h2>
-                {!subject.archived && (
-                  <button
-                    onClick={() => navigate(`/subjects/${id}/units`)}
-                    className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
-                  >
-                    Curriculum Management
-                  </button>
-                )}
-              </div>
-              {(!subject.units || subject.units.length === 0) ? (
-                <div className="bg-white dark:bg-[#1a1a1a] border border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl px-6 py-8 text-center">
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Sparkles size={22} className="text-green-500 dark:text-green-400" />
+            {activeTab === 'overview' && (
+              <div className="space-y-6 animate-fade-in">
+                {/* Progress bar */}
+                {totalTopics > 0 && (
+                  <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl px-5 py-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">{progressPct}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 dark:bg-[#2a2a2a] rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{completedTopics} of {totalTopics} topics completed</p>
                   </div>
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">No units added yet</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Auto-populate from your syllabus PDF, or add units manually.</p>
-                  {!subject.archived && (
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                      <button
-                        onClick={() => navigate(`/subjects/${id}/units`, { state: { openParseModal: true } })}
-                        className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-                      >
-                        <Sparkles size={13} />
-                        Get syllabus from PDF
-                      </button>
+                )}
+
+                {/* Topic Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Last */}
+                  <div className="bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900/40 rounded-xl px-4 py-3.5 flex flex-col justify-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 mb-1">Last Taught</p>
+                    {lastTopic ? (
+                      <>
+                        <p className="text-sm font-semibold text-violet-800 dark:text-violet-300 line-clamp-1">{lastTopic.title}</p>
+                        <div className="flex items-center gap-1 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
+                          <p className="text-[11px] text-violet-600/70 dark:text-violet-500/70 truncate">{lastTopic.unitTitle}</p>
+                          <span className="text-violet-300 dark:text-violet-700">·</span>
+                          <p className="text-[11px] text-violet-600/70 dark:text-violet-500/70">{formatDate(lastTopic.completedAt)}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-violet-700/50 dark:text-violet-400/50 italic">No last topic</p>
+                    )}
+                  </div>
+
+                  {/* Current */}
+                  <button
+                    disabled={subject.archived || subject.units?.length === 0 || (availableForCurrent === 0 && !subject.currentTopic)}
+                    onClick={() => setTopicPicker('current')}
+                    className={`flex flex-col justify-center text-left px-4 py-3.5 rounded-xl border transition-all relative group
+                      ${subject.currentTopic
+                        ? 'bg-green-50 dark:bg-[#052e16]/40 border-green-200 dark:border-green-900/40 hover:bg-green-100 dark:hover:bg-[#052e16]/60'
+                        : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#2a2a2a] hover:border-green-500/50 hover:shadow-md'
+                      }
+                      disabled:opacity-60 disabled:cursor-not-allowed
+                    `}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${subject.currentTopic ? 'text-green-600 dark:text-green-500' : 'text-gray-400 dark:text-gray-500'
+                        }`}>Currently Teaching</p>
+                      <div className={`p-1 rounded-full transition-colors ${subject.currentTopic ? 'bg-green-200/50 dark:bg-green-900/30 text-green-700' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400'
+                        } group-hover:bg-green-500 group-hover:text-white`}>
+                        <CirclePlay size={14} />
+                      </div>
+                    </div>
+                    {subject.currentTopic ? (
+                      <>
+                        <p className="text-sm font-semibold text-green-800 dark:text-green-300 line-clamp-1">{subject.currentTopic.title}</p>
+                        <p className="text-[11px] text-green-600/70 dark:text-green-500/70 mt-0.5 truncate">{subject.currentTopic.unit?.title}</p>
+                      </>
+                    ) : (
+                      <div className="flex flex-col">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 italic">
+                          {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
+                        </p>
+                        {!isSyllabusCompleted && (
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Click to select current topic</p>
+                        )}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Next */}
+                  <button
+                    disabled={subject.archived || subject.units?.length === 0 || (availableForNext === 0 && !subject.nextTopic)}
+                    onClick={() => setTopicPicker('next')}
+                    className={`flex flex-col justify-center text-left px-4 py-3.5 rounded-xl border transition-all relative group
+                      ${subject.nextTopic
+                        ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-950/40'
+                        : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#2a2a2a] hover:border-blue-500/50 hover:shadow-md'
+                      }
+                      disabled:opacity-60 disabled:cursor-not-allowed
+                    `}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${subject.nextTopic ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
+                        }`}>Up Next</p>
+                      <div className={`p-1 rounded-full transition-colors ${subject.nextTopic ? 'bg-blue-200/50 dark:bg-blue-900/30 text-blue-700' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400'
+                        } group-hover:bg-blue-500 group-hover:text-white`}>
+                        <SkipForward size={14} />
+                      </div>
+                    </div>
+                    {subject.nextTopic ? (
+                      <>
+                        <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 line-clamp-1">{subject.nextTopic.title}</p>
+                        <p className="text-[11px] text-blue-600/70 dark:text-blue-500/70 mt-0.5 truncate">{subject.nextTopic.unit?.title}</p>
+                      </>
+                    ) : (
+                      <div className="flex flex-col">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 italic">
+                          {isSyllabusCompleted ? "Syllabus Completed" : "Not set"}
+                        </p>
+                        {!isSyllabusCompleted && (
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Click to select next topic</p>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Curriculum */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Curriculum</h2>
+                    {!subject.archived && (
                       <button
                         onClick={() => navigate(`/subjects/${id}/units`)}
-                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                        className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
                       >
-                        Or add manually →
+                        Curriculum Management
                       </button>
+                    )}
+                  </div>
+                  {(!subject.units || subject.units.length === 0) ? (
+                    <div className="bg-white dark:bg-[#1a1a1a] border border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl px-6 py-8 text-center">
+                      <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <Sparkles size={22} className="text-green-500 dark:text-green-400" />
+                      </div>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">No units added yet</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Auto-populate from your syllabus PDF, or add units manually.</p>
+                      {!subject.archived && (
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                          <button
+                            onClick={() => navigate(`/subjects/${id}/units`, { state: { openParseModal: true } })}
+                            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+                          >
+                            <Sparkles size={13} />
+                            Get syllabus from PDF
+                          </button>
+                          <button
+                            onClick={() => navigate(`/subjects/${id}/units`)}
+                            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                          >
+                            Or add manually →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pt-1">
+                      {subject.units.map(unit => (
+                        <UnitAccordion
+                          key={unit.id}
+                          unit={unit}
+                          currentTopicId={currentTopicId}
+                          nextTopicId={nextTopicId}
+                          homeworkTopicIds={homeworkTopicIds}
+                          onToggleComplete={handleToggleComplete}
+                          isArchived={subject.archived}
+                          subjectId={subjectId}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="space-y-3 pt-1">
-                  {subject.units.map(unit => (
-                    <UnitAccordion
-                      key={unit.id}
-                      unit={unit}
-                      currentTopicId={currentTopicId}
-                      nextTopicId={nextTopicId}
-                      onToggleComplete={handleToggleComplete}
-                      isArchived={subject.archived}
-                      subjectId={subjectId}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {activeTab === 'homework' && (
+              <HomeworkTab subjectId={subjectId} isTeacher={true} units={subject.units} />
+            )}
 
           </div>
         )}
@@ -518,10 +535,10 @@ export default function SubjectDetailPage() {
                   description="Upload a syllabus PDF file (Max 2MB)."
                   action={
                     <div className="flex items-center justify-end gap-2">
-                       {subject?.isSyllabusPdfAvailable ? (
+                      {subject?.isSyllabusPdfAvailable ? (
                         <>
-                          <button 
-                            onClick={handleViewSyllabus} 
+                          <button
+                            onClick={handleViewSyllabus}
                             disabled={isFetchingSyllabus}
                             className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium py-1 disabled:opacity-50"
                           >
@@ -649,7 +666,7 @@ export default function SubjectDetailPage() {
           confirmText="Delete Syllabus"
           loading={deleteSyllabusMutation.isPending}
         />
-        
+
       </div>
     </div>
   )

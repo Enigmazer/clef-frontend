@@ -4,5 +4,10 @@ export function formatDate(instant) {
 }
 
 export function getErrorMsg(err) {
-  return err?.response?.data?.message ?? 'Something went wrong.'
+  const data = err?.response?.data
+  if (data?.fieldErrors) {
+    const firstFieldError = Object.values(data.fieldErrors)[0]
+    if (firstFieldError) return firstFieldError
+  }
+  return data?.message ?? 'Something went wrong.'
 }

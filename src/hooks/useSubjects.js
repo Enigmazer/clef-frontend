@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   createSubject,
@@ -20,7 +21,15 @@ import {
   parseSyllabus,
   getSyllabusUrl,
   getTeacherProfile,
+  createHomework,
+  getHomeworkPage,
+  updateHomework,
+  deleteHomework,
 } from '../api/subjects'
+import { useUploads } from '../context/UploadContext'
+
+// Captured once at module load — safe to use during render (not impure)
+const MODULE_NOW = Date.now()
 
 // ─── Teacher subject queries ──────────────────────────────────────────────────
 export function useTeacherSubjects() {
@@ -140,8 +149,22 @@ export function useArchiveUnarchiveSubject(subjectId) {
 
 export function useUploadSyllabus(subjectId) {
   const qc = useQueryClient()
+  const { startUpload, updateProgress, completeUpload, failUpload } = useUploads()
   return useMutation({
-    mutationFn: (file) => uploadSyllabus(subjectId, file),
+    mutationFn: async (file) => {
+      const uploadId = `syllabus-${subjectId}-${Date.now()}`
+      startUpload(uploadId, file.name || 'Syllabus')
+      try {
+        const result = await uploadSyllabus(subjectId, file, (progress) => {
+          updateProgress(uploadId, progress)
+        })
+        completeUpload(uploadId)
+        return result
+      } catch (error) {
+        failUpload(uploadId, error?.response?.data?.message || error.message || 'Upload failed')
+        throw error
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
       qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'syllabus'] })
@@ -198,4 +221,64 @@ export function useJoinSubject() {
     mutationFn: (joinCode) => joinSubject(joinCode),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', 'student'] }),
   })
+}
+
+// ─── Homework mutations & queries ─────────────────────────────────────────────
+export function useCreateHomework(subjectId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data) => createHomework(subjectId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'homework'] }),
+  })
+}
+
+export function useUpdateHomework(subjectId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ homeWorkId, data }) => updateHomework(subjectId, homeWorkId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'homework'] }),
+  })
+}
+
+export function useDeleteHomework(subjectId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (homeWorkId) => deleteHomework(subjectId, homeWorkId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'homework'] }),
+  })
+}
+
+export function useHomeworkPage(subjectId, page = 0, filter = 'upcoming') {
+  return useQuery({
+    queryKey: ['subjects', subjectId, 'homework', filter, page],
+    queryFn: () => getHomeworkPage(subjectId, page, filter),
+    enabled: !!subjectId,
+  })
+}
+
+export function useActiveHomeworkTopicIds(subjectId) {
+  const { data: homeworkPage } = useHomeworkPage(subjectId, 0, 'upcoming')
+
+  return useMemo(() => {
+    const ids = new Set()
+    if (!homeworkPage?.content?.length) return ids
+
+    const nowMs = MODULE_NOW
+    const nowDate = new Date(nowMs)
+
+    for (const hw of homeworkPage.content) {
+      const dueMs = new Date(hw.dueDate).getTime()
+      const dueDateObj = new Date(hw.dueDate)
+      
+      const isDueToday = dueDateObj.toDateString() === nowDate.toDateString()
+      const isFuture = dueMs > nowMs
+      
+      if (isDueToday || isFuture) {
+        for (const topic of hw.topics ?? []) {
+          ids.add(topic.id)
+        }
+      }
+    }
+    return ids
+  }, [homeworkPage])
 }
