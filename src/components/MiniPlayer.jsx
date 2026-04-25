@@ -81,8 +81,7 @@ export default function MiniPlayer() {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-[9999] shadow-2xl rounded-xl overflow-hidden bg-[#111] border border-white/10 select-none group"
-      style={{ width: 320, height: 180 }}
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] shadow-2xl rounded-xl overflow-hidden bg-[#111] border border-white/10 select-none group w-[min(320px,calc(100vw-32px))] aspect-video"
     >
       {/* Media */}
       {isVideo ? (

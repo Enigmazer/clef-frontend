@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, Layers, AlertCircle, Link2, Phone, Info
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
-import { useStudentSubjectDetail, useTeacherProfile, useActiveHomeworkTopicIds } from '../hooks/useSubjects'
-import { getSyllabusUrl } from '../api/subjects'
+import ConfirmModal from '../components/ConfirmModal'
+import { useStudentSubjectDetail, useTeacherProfile, useActiveHomeworkTopicIds, useHomeworkUpdateCheck, updateHomeworkSnapshot } from '../hooks/useSubjects'
+import { getSyllabusUrl, removeYourEnrollment } from '../api/subjects'
 import { UnitAccordion } from '../components/CurriculumAccordion'
 import HomeworkTab from '../components/subject/HomeworkTab'
 
@@ -27,21 +28,49 @@ export default function StudentSubjectDetailPage() {
 
   const [showInfo, setShowInfo] = useState(false)
   const [isFetchingSyllabus, setIsFetchingSyllabus] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const { data: teacherProfile, isLoading: isTeacherLoading } = useTeacherProfile(subjectId, showInfo)
   const homeworkTopicIds = useActiveHomeworkTopicIds(subjectId)
+  const { hasUpdate: hasHomeworkUpdate, maxCreatedAt: hwMaxCreatedAt, maxUpdatedAt: hwMaxUpdatedAt } = useHomeworkUpdateCheck(subjectId)
+
+  useEffect(() => {
+    if (activeTab === 'homework' && hasHomeworkUpdate) {
+      updateHomeworkSnapshot(subjectId, hwMaxCreatedAt, hwMaxUpdatedAt)
+    }
+  }, [activeTab, hasHomeworkUpdate, subjectId, hwMaxCreatedAt, hwMaxUpdatedAt])
 
   const handleViewSyllabus = async () => {
     setIsFetchingSyllabus(true)
     try {
       const res = await getSyllabusUrl(subjectId)
-      if (res?.syllabusUrl) {
-        window.open(res.syllabusUrl, '_blank', 'noopener,noreferrer')
+      if (res?.url) {
+        const link = document.createElement('a');
+        link.href = res.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
     } catch (err) {
       console.error('Failed to load syllabus', err)
     } finally {
       setIsFetchingSyllabus(false)
+    }
+  }
+
+  const handleLeaveSubject = async () => {
+    setIsLeaving(true)
+    try {
+      await removeYourEnrollment(subjectId)
+      setShowLeaveConfirm(false)
+      setShowInfo(false)
+      navigate('/enrollments')
+    } catch (err) {
+      console.error('Failed to leave subject', err)
+      setIsLeaving(false)
     }
   }
 
@@ -58,7 +87,7 @@ export default function StudentSubjectDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-6 py-10">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         <button
           onClick={() => navigate('/enrollments')}
@@ -114,10 +143,16 @@ export default function StudentSubjectDetailPage() {
                 Overview
               </button>
               <button
-                onClick={() => setActiveTab('homework')}
-                className={`px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'homework' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                onClick={() => {
+                  setActiveTab('homework')
+                  if (hasHomeworkUpdate) {
+                    updateHomeworkSnapshot(subjectId, hwMaxCreatedAt, hwMaxUpdatedAt)
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'homework' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
               >
                 Homework
+                {hasHomeworkUpdate && <span className="w-2 h-2 rounded-full bg-red-500" />}
               </button>
             </div>
 
@@ -288,8 +323,29 @@ export default function StudentSubjectDetailPage() {
                 <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-1">No syllabus has been uploaded for this subject yet.</p>
               )}
             </div>
+
+            {/* Leave Subject */}
+            <div className="pt-4 mt-2 border-t border-gray-100 dark:border-[#2a2a2a]">
+              <button
+                onClick={() => setShowLeaveConfirm(true)}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-900/50 rounded-xl transition-colors"
+              >
+                Leave Subject
+              </button>
+            </div>
           </div>
         </Modal>
+
+        <ConfirmModal
+          isOpen={showLeaveConfirm}
+          onClose={() => setShowLeaveConfirm(false)}
+          onConfirm={handleLeaveSubject}
+          title="Leave Subject"
+          message={`Are you sure you want to leave "${subject?.name}"?`}
+          confirmText="Yes, Leave"
+          variant="danger"
+          loading={isLeaving}
+        />
 
       </div>
     </div>

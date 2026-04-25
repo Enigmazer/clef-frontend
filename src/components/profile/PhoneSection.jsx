@@ -129,7 +129,7 @@ export default function PhoneSection() {
     }
   }
 
-  const handleSetPrimary = async (phoneNumber) => {
+  const handleSetPrimary = async () => {
     if (is2faEnabled) {
       setW({ tfaGuardModal: true })
       return
@@ -137,7 +137,7 @@ export default function PhoneSection() {
 
     clearMessages()
     try {
-      await mutations.setPrimaryPhone.mutateAsync(phoneNumber)
+      await mutations.setPrimaryPhone.mutateAsync()
       setW({ success: 'Primary phone updated.' })
     } catch (err) {
       setW({ error: getErrorMessage(err, 'Could not set primary phone.') })

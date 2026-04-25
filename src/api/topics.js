@@ -1,10 +1,10 @@
 import api from './axios'
 
 export const updateTopics = (subjectId, unitId, topics) =>
-  api.patch(`/subjects/${subjectId}/units/${unitId}/topics/update`, topics).then((res) => res.data)
+  api.patch(`/subjects/${subjectId}/units/${unitId}/topics`, topics).then((res) => res.data)
 
 export const deleteTopics = (subjectId, unitId, topicIds) =>
-  api.delete(`/subjects/${subjectId}/units/${unitId}/topics/delete`, { data: topicIds }).then((res) => res.data)
+  api.delete(`/subjects/${subjectId}/units/${unitId}/topics`, { data: { topicIds } }).then((res) => res.data)
 
 export const toggleTopicComplete = (subjectId, unitId, topicId) =>
   api.patch(`/subjects/${subjectId}/units/${unitId}/topics/${topicId}/complete/toggle`).then((res) => res.data)
@@ -28,5 +28,5 @@ export const uploadTopicMaterial = (subjectId, unitId, topicId, file, onProgress
 
 export const deleteTopicMaterials = (subjectId, unitId, topicId, materialIds) =>
   api.delete(`/subjects/${subjectId}/units/${unitId}/topics/${topicId}/topic-materials`, {
-    data: materialIds
+    data: { topicMaterialIds: materialIds }
   }).then((res) => res.data)

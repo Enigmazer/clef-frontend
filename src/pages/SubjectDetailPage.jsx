@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, Lock, LockOpen, Archive, ArchiveRestore,
@@ -7,10 +7,11 @@ import {
 import Navbar from '../components/Navbar'
 import Modal from '../components/Modal'
 import {
-  useTeacherSubjectDetail, useEnrolledStudents,
+  useTeacherSubjectDetail,
   useLockUnlockSubject, useArchiveUnarchiveSubject,
   useUpdateSubject, useUploadSyllabus, useDeleteSyllabus, useSetCurrentTopic,
-  useSetNextTopic, useDeleteSubject, useActiveHomeworkTopicIds
+  useSetNextTopic, useDeleteSubject, useActiveHomeworkTopicIds,
+  useHomeworkUpdateCheck, updateHomeworkSnapshot
 } from '../hooks/useSubjects'
 import { getSyllabusUrl } from '../api/subjects'
 import { useToggleTopicComplete } from '../hooks/useTopics'
@@ -21,13 +22,13 @@ import JoinCodePill from '../components/subject/JoinCodePill'
 import SettingRow from '../components/subject/SettingRow'
 import TopicPickerModal from '../components/subject/TopicPickerModal'
 import HomeworkTab from '../components/subject/HomeworkTab'
+import EnrolledStudentsTab from '../components/subject/EnrolledStudentsTab'
 
 export default function SubjectDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const subjectId = Number(id)
   const { data: subject, isLoading, isError } = useTeacherSubjectDetail(subjectId)
-  const { data: students = [], isLoading: studentsLoading } = useEnrolledStudents(subjectId)
 
   // Edit mode
   const [editName, setEditName] = useState('')
@@ -49,11 +50,17 @@ export default function SubjectDetailPage() {
   const deleteMutation = useDeleteSubject()
   const toggleCompleteMutation = useToggleTopicComplete(subjectId)
   const homeworkTopicIds = useActiveHomeworkTopicIds(subjectId)
+  const { hasUpdate: hasHomeworkUpdate, maxCreatedAt: hwMaxCreatedAt, maxUpdatedAt: hwMaxUpdatedAt } = useHomeworkUpdateCheck(subjectId)
 
   const [topicPicker, setTopicPicker] = useState(null) // 'current' | 'next' | null
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showSyllabusDeleteConfirm, setShowSyllabusDeleteConfirm] = useState(false)
-  const [showStudents, setShowStudents] = useState(false)
+
+  useEffect(() => {
+    if (activeTab === 'homework' && hasHomeworkUpdate) {
+      updateHomeworkSnapshot(subjectId, hwMaxCreatedAt, hwMaxUpdatedAt)
+    }
+  }, [activeTab, hasHomeworkUpdate, subjectId, hwMaxCreatedAt, hwMaxUpdatedAt])
 
   // Inline errors
   const [actionError, setActionError] = useState('')
@@ -146,8 +153,14 @@ export default function SubjectDetailPage() {
     setIsFetchingSyllabus(true)
     try {
       const res = await getSyllabusUrl(subjectId)
-      if (res?.syllabusUrl) {
-        window.open(res.syllabusUrl, '_blank', 'noopener,noreferrer')
+      if (res?.url) {
+        const link = document.createElement('a');
+        link.href = res.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else {
         setActionError('Syllabus URL not found.')
       }
@@ -184,7 +197,7 @@ export default function SubjectDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-6 py-10">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         <button
           onClick={() => navigate('/subjects')}
@@ -291,10 +304,22 @@ export default function SubjectDetailPage() {
                 Overview
               </button>
               <button
-                onClick={() => setActiveTab('homework')}
-                className={`px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'homework' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                onClick={() => {
+                  setActiveTab('homework')
+                  if (hasHomeworkUpdate) {
+                    updateHomeworkSnapshot(subjectId, hwMaxCreatedAt, hwMaxUpdatedAt)
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'homework' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
               >
                 Homework
+                {hasHomeworkUpdate && <span className="w-2 h-2 rounded-full bg-red-500" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('students')}
+                className={`px-4 py-2.5 font-medium text-sm transition-colors border-b-2 ${activeTab === 'students' ? 'border-green-500 text-green-600 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              >
+                Students
               </button>
             </div>
 
@@ -470,6 +495,10 @@ export default function SubjectDetailPage() {
               <HomeworkTab subjectId={subjectId} isTeacher={true} units={subject.units} />
             )}
 
+            {activeTab === 'students' && (
+              <EnrolledStudentsTab subjectId={subjectId} />
+            )}
+
           </div>
         )}
 
@@ -563,42 +592,6 @@ export default function SubjectDetailPage() {
                     </div>
                   }
                 />
-
-                <SettingRow
-                  title="Enrolled Students"
-                  description={studentsLoading ? 'Loading…' : `${students.length} students have joined.`}
-                  action={<button onClick={() => setShowStudents(v => !v)} className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">{showStudents ? 'Hide' : 'View list'}</button>}
-                />
-
-                {showStudents && (
-                  <div className="bg-gray-50 dark:bg-[#111] border border-gray-100 dark:border-[#2a2a2a] rounded-xl p-4 animate-fade-in mx-1 mt-1 mb-3">
-                    {!studentsLoading && students.length === 0 && (
-                      <p className="text-sm text-gray-400 dark:text-gray-500 italic text-center">No students enrolled yet.</p>
-                    )}
-                    <div className="space-y-3 max-h-48 overflow-y-auto">
-                      {students.map(s => (
-                        <div key={s.id} className="flex items-center gap-3">
-                          {s.avatarUrl
-                            ? <img
-                              src={s.avatarUrl}
-                              alt={s.fullName}
-                              className="w-8 h-8 rounded-full object-cover"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }}
-                            />
-                            : null}
-                          <div
-                            className="w-8 h-8 rounded-full bg-green-100 dark:bg-[#052e16] text-green-700 dark:text-green-400 flex items-center justify-center text-xs font-bold"
-                            style={{ display: s.avatarUrl ? 'none' : 'flex' }}
-                          >
-                            {s.fullName?.[0]?.toUpperCase() ?? '?'}
-                          </div>
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.fullName}</span>
-                          <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto tabular-nums">Joined {formatDate(s.joinedAt)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-100 dark:border-[#2a2a2a] mt-2">
                   <button

@@ -107,17 +107,18 @@ export default function LoadingScreen({ isBackendError, onRetry }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#0a0a0c] text-white flex flex-col items-center justify-center p-6 overflow-hidden">
-      {/* Background Glows (Core Clef Green) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-500/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-green-500/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="fixed inset-0 z-[9999] bg-[#0a0a0c] text-white overflow-y-auto overflow-x-hidden">
+      <div className="min-h-[100dvh] w-full flex flex-col items-center justify-start lg:justify-center p-4 sm:p-6 py-12 relative">
+        {/* Background Glows (Core Clef Green) */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-500/10 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-green-500/10 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center mt-8 lg:mt-0 mb-16 lg:mb-0">
         
         {/* Left Side: Communication & Showcase */}
         <div className="flex flex-col space-y-8 relative">
-          <div className="space-y-4">
-            <h1 className="text-4xl lg:text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-green-600">
+          <div className="space-y-4 text-center lg:text-left">
+            <h1 className="text-3xl sm:text-4xl lg:text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-green-600">
               Cold-starting Server
             </h1>
             <p className="text-gray-400 text-lg max-w-md leading-relaxed">
@@ -127,8 +128,8 @@ export default function LoadingScreen({ isBackendError, onRetry }) {
           </div>
 
           {/* 3D Feature Carousel Wrapper */}
-          <div className="relative group/carousel">
-            <div className="relative h-72 perspective-1000 preserve-3d">
+          <div className="relative group/carousel hidden sm:block">
+            <div className="relative h-64 lg:h-72 perspective-1000 preserve-3d">
               {FEATURES.map((feature, index) => {
                 const diff = index - currentSlide
                 const rotation = diff * 45
@@ -146,10 +147,10 @@ export default function LoadingScreen({ isBackendError, onRetry }) {
                       opacity: opacity,
                       zIndex: zIndex,
                     }}
-                    className="absolute inset-0 bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-md transition-all duration-700 ease-in-out backface-hidden flex flex-col justify-center"
+                    className="absolute inset-0 bg-white/5 border border-white/10 rounded-3xl p-6 lg:p-8 backdrop-blur-md transition-all duration-700 ease-in-out backface-hidden flex flex-col justify-center"
                   >
-                    <div className="mb-4"><Icon className="w-12 h-12 text-green-500" /></div>
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+                    <div className="mb-3 lg:mb-4"><Icon className="w-10 h-10 lg:w-12 lg:h-12 text-green-500" /></div>
+                    <h3 className="text-lg lg:text-xl font-bold mb-2">{feature.title}</h3>
                     <p className="text-gray-400 leading-relaxed text-sm lg:text-base">{feature.description}</p>
                     
                     {/* Inner active glow */}
@@ -188,7 +189,7 @@ export default function LoadingScreen({ isBackendError, onRetry }) {
           </div>
 
           {/* Status Message */}
-          <div className="flex items-center space-x-3 text-sm font-medium pt-12">
+          <div className="flex items-center justify-center lg:justify-start space-x-3 text-sm font-medium pt-4 sm:pt-12">
             {isBackendError ? (
               <div className="flex flex-col space-y-4">
                 <div className="flex items-center space-x-2 text-red-400">
@@ -305,10 +306,11 @@ export default function LoadingScreen({ isBackendError, onRetry }) {
 
       </div>
 
-      {/* Footer Branding */}
-      <div className="absolute bottom-10 flex flex-col items-center space-y-3 opacity-20 group hover:opacity-100 transition-all duration-500 select-none cursor-default">
-        <Logo />
-        <span className="text-[10px] font-black tracking-[0.4em] uppercase text-white/50 group-hover:text-green-500 transition-colors">keep your class in sync</span>
+        {/* Footer Branding */}
+        <div className="absolute bottom-6 flex flex-col items-center space-y-3 opacity-20 group hover:opacity-100 transition-all duration-500 select-none cursor-default">
+          <Logo />
+          <span className="text-[10px] font-black tracking-[0.4em] uppercase text-white/50 group-hover:text-green-500 transition-colors text-center">keep your class in sync</span>
+        </div>
       </div>
     </div>
   )

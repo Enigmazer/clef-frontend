@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { getMe } from '../api/users'
 import { logout as logoutApi } from '../api/auth'
 import { tokenStore } from '../api/tokenStore'
+import { clearSubjectCache } from '../hooks/useSubjects'
 
 const AuthContext = createContext(null)
 
@@ -39,6 +40,7 @@ export function AuthProvider({ children }) {
     } catch {
       // proceed regardless
     }
+    clearSubjectCache()
     tokenStore.clear()
     setUser(null)
     window.location.href = '/login'

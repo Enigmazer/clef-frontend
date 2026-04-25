@@ -12,5 +12,5 @@ export const verifyOtp = (phoneNumber, code) =>
 export const deletePhone = (phoneNumber) =>
     api.delete('/phone/delete', { data: { phoneNumber } })
 
-export const setPrimaryPhone = (phoneNumber) =>
-    api.post('/phone/set-primary', { phoneNumber })
+export const setPrimaryPhone = () =>
+    api.post('/phone/set-primary')

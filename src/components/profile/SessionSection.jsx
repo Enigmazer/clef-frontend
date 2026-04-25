@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { logout as logoutApi, logoutAll as logoutAllApi } from '../../api/auth'
 import { Card, SectionTitle, StatusBanner } from './ProfileUI'
 import { getErrorMessage } from './helpers'
+import { clearSubjectCache } from '../../hooks/useSubjects'
 
 export default function SessionSection() {
   const navigate = useNavigate()
@@ -18,9 +19,11 @@ export default function SessionSection() {
     setError('')
     try {
       await logoutApi()
+      clearSubjectCache()
       refreshUser(null)
       navigate('/login', { replace: true })
     } catch {
+      clearSubjectCache()
       refreshUser(null)
       navigate('/login', { replace: true })
     }
@@ -31,6 +34,7 @@ export default function SessionSection() {
     setError('')
     try {
       await logoutAllApi()
+      clearSubjectCache()
       refreshUser(null)
       navigate('/login', { replace: true })
     } catch (err) {

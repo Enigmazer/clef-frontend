@@ -78,7 +78,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-2xl mx-auto px-6 py-10 space-y-5">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-5">
 
         {/* ── Profile header card ── */}
         <Card>

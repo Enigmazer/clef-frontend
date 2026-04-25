@@ -129,35 +129,39 @@ export default function ExistingUnitRow({ subjectId, unit }) {
     return (
       <div className="border border-green-200 dark:border-green-900/60 bg-white dark:bg-[#1a1a1a] rounded-xl overflow-hidden animate-fade-in shadow-sm my-3">
         {/* Editor header */}
-        <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-[#052e16]/40 border-b border-green-200 dark:border-green-900/60">
-          <Layers size={14} className="text-green-500 shrink-0" />
-          <input
-            type="text"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            placeholder="Unit title"
-            className="flex-1 bg-white dark:bg-[#111] border border-green-200 dark:border-green-900/60 rounded-lg px-2 py-1 text-sm font-semibold text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500"
-            autoFocus
-          />
-          <button
-            onClick={() => {
-              setIsEditing(false)
-              setEditTitle(unit.title)
-              setNewTopics([])
-              setUnitError('')
-            }}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-2 py-1 text-xs font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUnitSave}
-            disabled={isUpdating}
-            className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save size={12} />
-            {isUpdating ? 'Saving…' : 'Save'}
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-3 sm:px-4 py-3 bg-green-50 dark:bg-[#052e16]/40 border-b border-green-200 dark:border-green-900/60">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Layers size={14} className="text-green-500 shrink-0" />
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Unit title"
+              className="flex-1 bg-white dark:bg-[#111] border border-green-200 dark:border-green-900/60 rounded-lg px-2 py-1 text-sm font-semibold text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500 min-w-0"
+              autoFocus
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setIsEditing(false)
+                setEditTitle(unit.title)
+                setNewTopics([])
+                setUnitError('')
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-2 py-1 text-xs font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUnitSave}
+              disabled={isUpdating}
+              className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save size={12} />
+              {isUpdating ? 'Saving…' : 'Save'}
+            </button>
+          </div>
         </div>
 
         {unitError && (
@@ -291,38 +295,41 @@ export default function ExistingUnitRow({ subjectId, unit }) {
       <div className="w-full flex items-stretch justify-between bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors">
         <button
           onClick={() => setOpen(o => !o)}
-          className="flex-1 flex items-center gap-3 px-4 py-3.5 text-left outline-none"
+          className="flex-1 flex items-center gap-3 px-3 sm:px-4 py-3.5 text-left outline-none min-w-0"
         >
           <Layers size={15} className="text-green-500 shrink-0" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">{unit.title}</span>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {unit.topics.length} topic{unit.topics.length !== 1 ? 's' : ''}
-          </span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 min-w-0 flex-1">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{unit.title}</span>
+            <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 shrink-0">
+              {unit.topics.length} topic{unit.topics.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </button>
-        <div className="flex items-center gap-2 pr-4 py-3.5">
+        <div className="flex items-center gap-1 sm:gap-2 pr-3 sm:pr-4 py-3.5 pl-1 shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); setUploadModalOpen(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+            title="Add Content"
           >
-            <Plus size={13} />
-            Add Content
+            <Plus size={13} className="shrink-0" />
+            <span className="hidden sm:inline">Add Content</span>
           </button>
           <button
             onClick={handleEditClick}
-            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50 ml-1"
+            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50 sm:ml-1"
             title="Edit Unit"
           >
-            <Edit2 size={14} />
+            <Edit2 size={14} className="shrink-0" />
           </button>
           <button
             onClick={handleUnitDelete}
             className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
             title="Delete Unit"
           >
-            <Trash2 size={14} />
+            <Trash2 size={14} className="shrink-0" />
           </button>
-          <button onClick={() => setOpen(o => !o)} className="ml-1 p-1 outline-none text-gray-400">
-            {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          <button onClick={() => setOpen(o => !o)} className="sm:ml-1 p-1 outline-none text-gray-400">
+            {open ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
           </button>
         </div>
       </div>

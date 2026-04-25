@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Layers, BookOpen } from 'lucide-react'
+import { ChevronDown, ChevronRight, Layers, BookOpen, CheckSquare, Square } from 'lucide-react'
 import TopicMaterialPill from './TopicMaterialPill'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -37,7 +37,16 @@ function TopicRow({ topic, isCurrent, isNext, isDone, isInHomework, subjectId, u
       >
         <div className="flex flex-col flex-1 min-w-0 pr-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-start gap-2.5 min-w-0">
+              {/* Teacher-only: Mobile Left-side Checkbox Toggle */}
+              {isTeacher && !isArchived && (
+                <button
+                  onClick={e => { e.stopPropagation(); onToggleComplete(unitId, topic.id) }}
+                  className="sm:hidden mt-[3px] shrink-0 text-gray-400 dark:text-gray-500 hover:text-green-500 transition-colors"
+                >
+                  {isDone ? <CheckSquare size={16} className="text-green-600 dark:text-green-400" /> : <Square size={16} />}
+                </button>
+              )}
               <span className={`text-sm ${
                 isDone      ? 'text-gray-400 dark:text-gray-500 line-through'
                 : isCurrent ? 'text-green-700 dark:text-green-400 font-medium'
@@ -49,9 +58,9 @@ function TopicRow({ topic, isCurrent, isNext, isDone, isInHomework, subjectId, u
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Teacher-only: mark complete/incomplete button */}
+              {/* Teacher-only: mark complete/incomplete button (PC) */}
               {isTeacher && !isArchived && (
-                <div className="opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center pr-3 border-r border-gray-200 dark:border-[#333]">
+                <div className="hidden sm:flex opacity-0 group-hover/row:opacity-100 transition-opacity items-center pr-3 border-r border-gray-200 dark:border-[#333]">
                   <button
                     onClick={e => { e.stopPropagation(); onToggleComplete(unitId, topic.id) }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -133,14 +142,14 @@ export function UnitAccordion({ unit, currentTopicId, nextTopicId, homeworkTopic
 
   return (
     <div className="border border-gray-200 dark:border-[#2a2a2a] rounded-xl overflow-hidden mb-3 last:mb-0">
-      <div className="w-full flex items-center justify-between px-4 py-3.5 bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors">
-        <button
-          onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-3 flex-1 text-left outline-none"
-        >
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3.5 bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors outline-none text-left"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
           <Layers size={15} className="text-green-500 shrink-0" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">{unit.title}</span>
-        </button>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{unit.title}</span>
+        </div>
 
         <div className="flex items-center gap-3 shrink-0">
           {/* Homework badge on the unit — only shown when some topics in this unit have homework */}
@@ -151,19 +160,16 @@ export function UnitAccordion({ unit, currentTopicId, nextTopicId, homeworkTopic
             </span>
           )}
 
-          <button
-            onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-3 pl-2 border-l border-gray-200 dark:border-[#333] outline-none"
-          >
+          <div className="flex items-center gap-3 pl-2 border-l border-gray-200 dark:border-[#333]">
             <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">
               {completedCount}/{unit.topics.length} done
             </span>
             {open
-              ? <ChevronDown size={15} className="text-gray-400" />
-              : <ChevronRight size={15} className="text-gray-400" />}
-          </button>
+              ? <ChevronDown size={15} className="text-gray-400 shrink-0" />
+              : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
+          </div>
         </div>
-      </div>
+      </button>
 
       {open && (
         <div className="divide-y divide-gray-100 dark:divide-[#2a2a2a] bg-gray-50 dark:bg-[#111] animate-fade-in">

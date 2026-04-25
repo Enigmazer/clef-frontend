@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { RouterProvider } from 'react-router-dom'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -40,6 +41,7 @@ export default function App() {
                   <MiniPlayer />
                 </Suspense>
               </BackendReadyGate>
+              <SpeedInsights />
             </AuthProvider>
           </UploadProvider>
         </PlayerProvider>

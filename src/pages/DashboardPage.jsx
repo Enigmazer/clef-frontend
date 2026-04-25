@@ -45,7 +45,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-6 py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Welcome back{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}

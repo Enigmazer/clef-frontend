@@ -16,21 +16,30 @@ export default function TopicMaterialPill({ subjectId, unitId, topicId, material
     }
 
     if (loading) return
+    
     setLoading(true)
     setErr('')
     try {
       const res = await getTopicMaterialUrl(subjectId, unitId, topicId, material.id)
-      if (res.topicMaterialUrl) {
+      if (res?.url) {
         const type = material.type?.toLowerCase();
         if (type === 'video' || type === 'audio') {
           openPlayer({ 
-            url: res.topicMaterialUrl, 
+            url: res.url, 
             type: material.type, 
             title: material.title 
           });
         } else {
-          window.open(res.topicMaterialUrl, '_blank', 'noreferrer')
+          const link = document.createElement('a');
+          link.href = res.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
+      } else {
+        setErr('URL not found')
       }
     } catch (error) {
       console.error('Failed to get material URL:', error)

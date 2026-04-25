@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePlayer } from '../context/PlayerContext';
 import {
   X, Video, Music, RotateCcw, RotateCw, Monitor,
-  Maximize, Minimize, Play, Pause, Volume2, VolumeX, Loader2
+  Maximize, Minimize, Play, Pause, Volume2, VolumeX, Loader2,
+  ChevronDown
 } from 'lucide-react';
 
 function formatTime(time) {
@@ -41,11 +42,9 @@ export default function MaterialPlayerModal() {
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
 
-    if (isPlayingRef.current) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
-    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -65,14 +64,30 @@ export default function MaterialPlayerModal() {
     }
   }, [mediaRef, resetControlsTimeout]);
 
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(err => {
-        console.error(`Error: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+        if (window.screen?.orientation?.lock) {
+          try {
+            await window.screen.orientation.lock('landscape');
+          } catch (e) {
+            console.warn('Orientation lock failed', e);
+          }
+        }
+      } else {
+        await document.exitFullscreen();
+        if (window.screen?.orientation?.unlock) {
+          try {
+            window.screen.orientation.unlock();
+          } catch (e) {
+            console.warn('Orientation unlock failed', e);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`Error toggling fullscreen: ${err.message}`);
     }
     resetControlsTimeout();
   }, [resetControlsTimeout]);
@@ -180,18 +195,7 @@ export default function MaterialPlayerModal() {
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
-    if (isPlaying) {
-      const t = setTimeout(() => {
-        resetControlsTimeout();
-      }, 0);
-      return () => clearTimeout(t);
-    } else {
-      const t = setTimeout(() => {
-        setShowControls(true);
-      }, 0);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      return () => clearTimeout(t);
-    }
+    resetControlsTimeout();
   }, [isPlaying, resetControlsTimeout]);
 
   useEffect(() => {
@@ -211,10 +215,26 @@ export default function MaterialPlayerModal() {
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || isVideo) return;
+    if (!isOpen || isVideo || !commonMediaRef.current) return;
     const el = commonMediaRef.current;
-    if (el) setDuration(el.duration || 0);
-  }, [isOpen, isVideo, commonMediaRef]);
+    
+    if (el.readyState >= 1) {
+      setDuration(el.duration || 0);
+    }
+
+    const handleDurationChange = () => setDuration(el.duration || 0);
+    const handleTimeUpdate = () => setCurrentTime(el.currentTime || 0);
+
+    el.addEventListener('durationchange', handleDurationChange);
+    el.addEventListener('loadedmetadata', handleDurationChange);
+    el.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      el.removeEventListener('durationchange', handleDurationChange);
+      el.removeEventListener('loadedmetadata', handleDurationChange);
+      el.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [isOpen, isVideo, commonMediaRef, setCurrentTime]);
 
   if (!isOpen || !activeMaterial) return null;
 
@@ -227,17 +247,23 @@ export default function MaterialPlayerModal() {
       <div
         ref={containerRef}
         onMouseMove={resetControlsTimeout}
-        className={`bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden transform transition-all duration-300 border border-gray-100 dark:border-[#2a2a2a] relative group
-          ${isFullscreen ? 'max-w-none h-screen rounded-none border-none' : 'aspect-video scale-100 shadow-emerald-500/5'}
+        className={`bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 dark:border-[#2a2a2a] relative group
+          ${isFullscreen ? 'max-w-none h-full w-full rounded-none border-none' : 'aspect-video scale-100 shadow-emerald-500/5'}
           ${showControls ? 'cursor-default' : 'cursor-none'}
         `}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Header Overlay */}
-        <div className={`absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/70 to-transparent transition-all duration-500 ${showControls ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+        {/* Top Header Overlay, pointer-events-none to let clicks pass to center video */}
+        <div className={`absolute top-0 inset-x-0 z-20 pointer-events-none flex items-center justify-between p-4 sm:p-5 pb-12 bg-gradient-to-b from-black/90 via-black/50 to-transparent transition-all duration-500 ${showControls ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
           }`}>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`p-2 rounded-lg ${isVideo ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+          <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* YouTube style dismiss to PIP on mobile! */}
+            {!isFullscreen && (
+              <button onClick={(e) => { e.stopPropagation(); togglePip(); }} className="sm:hidden p-2 -ml-2 text-white hover:bg-white/20 rounded-full transition-colors" title="Miniplayer">
+                <ChevronDown size={24} />
+              </button>
+            )}
+            <div className={`hidden sm:flex p-2 rounded-lg ${isVideo ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
               }`}>
               {isVideo ? <Video size={18} /> : <Music size={18} />}
             </div>
@@ -245,7 +271,7 @@ export default function MaterialPlayerModal() {
               {activeMaterial.title}
             </h3>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="pointer-events-auto flex items-center gap-2">
             <button
               onClick={toggleFullscreen}
               className="p-2 hover:bg-white/20 rounded-full transition-colors text-white/90 hover:text-white"
@@ -298,48 +324,77 @@ export default function MaterialPlayerModal() {
             </div>
           )}
 
-          {/* Big Center Play/Pause Indicator */}
-          <div className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-500 ${!isPlaying ? 'opacity-100 scale-100' : 'opacity-0 scale-110'
-            }`}>
-            <div className="p-7 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white shadow-2xl">
-              <Play size={52} fill="currentColor" />
+          {/* Mobile Center Controls overlay & PC Paused Indicator */}
+          <div className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300 z-10 ${showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+            {/* Mobile Playback Controls */}
+            <div className="flex sm:hidden items-center gap-6 pointer-events-auto">
+              <button onClick={(e) => { e.stopPropagation(); handleSkip(-10); }} className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:text-emerald-400 active:scale-90 transition-all border border-white/10">
+                <RotateCcw size={22} />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="p-5 bg-black/50 backdrop-blur-md rounded-full text-white hover:text-emerald-400 active:scale-90 transition-all border border-white/20 shadow-2xl shadow-emerald-500/20">
+                {isPlaying ? <Pause size={36} fill="currentColor" /> : <Play size={36} fill="currentColor" className="ml-1" />}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); handleSkip(10); }} className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:text-emerald-400 active:scale-90 transition-all border border-white/10">
+                <RotateCw size={22} />
+              </button>
+            </div>
+
+            {/* PC aesthetic Paused Indicator */}
+            <div className={`hidden sm:flex p-7 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white shadow-2xl transition-all duration-500 ${!isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+              <Play size={52} fill="currentColor" className="ml-2" />
             </div>
           </div>
         </div>
 
-        {/* Bottom Custom Controls */}
-        <div className={`absolute bottom-0 inset-x-0 z-20 flex flex-col p-5 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-all duration-500 ${showControls ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+        {/* Bottom Custom Controls, pointer-events-none to pass clicks to video overlay */}
+        <div className={`absolute bottom-0 inset-x-0 z-20 pointer-events-none flex flex-col p-4 pb-4 sm:pb-5 sm:p-5 pt-16 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-all duration-500 ${showControls ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
           }`}>
-          {/* Unified SYNCED Seek Bar */}
-          <div className="group/timeline mb-4 relative flex items-center transition-all">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              step="0.01"
-              value={currentTime}
-              onChange={handleSeek}
-              className="pro-range-input h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-emerald-500 outline-none transition-all hover:bg-white/30"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <button onClick={togglePlay} className="text-white hover:text-emerald-400 transition-colors">
-                {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+          {/* Unified SYNCED Seek Bar & Time */}
+          <div className="pointer-events-auto flex items-center gap-3 sm:gap-4 sm:mb-6">
+            <span className="text-[10px] sm:text-xs text-white/90 font-bold font-mono tracking-wider tabular-nums shrink-0">
+              {formatTime(currentTime)}
+            </span>
+            <div className="group/timeline relative flex items-center transition-all flex-1">
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                step="0.01"
+                value={currentTime}
+                onChange={handleSeek}
+                className="pro-range-input h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/30 accent-emerald-500 outline-none transition-all hover:bg-white/50"
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs text-white/70 font-mono tracking-wider tabular-nums shrink-0">
+              {formatTime(duration)}
+            </span>
+            
+            <div className="sm:hidden flex items-center gap-3 shrink-0">
+              {/* Space-saving single button speed cycler for mobile inline with timeline */}
+              <button 
+                className="px-2 py-1 bg-white/20 text-white hover:bg-white/30 transition-colors font-mono text-[9px] font-bold rounded tracking-wider"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const nextSpeed = speed === 1 ? 1.5 : speed === 1.5 ? 2 : speed === 2 ? 0.5 : 1;
+                  handleSpeedChange(nextSpeed);
+                }}
+              >
+                {speed}x
               </button>
 
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => handleSkip(-10)} className="text-white/80 hover:text-white transition-colors" title="Back 10s (←)">
-                  <RotateCcw size={20} />
+              {/* Mobile PIP Button explicitly next to seek bar! */}
+              {!isFullscreen && (
+                <button onClick={(e) => { e.stopPropagation(); togglePip(); }} className="text-white/90 hover:text-white transition-colors p-1" title="Mini player">
+                  <Monitor size={18} />
                 </button>
-                <button onClick={() => handleSkip(10)} className="text-white/80 hover:text-white transition-colors" title="Forward 10s (→)">
-                  <RotateCw size={20} />
-                </button>
-              </div>
+              )}
+            </div>
+          </div>
 
-              {/* Volume Control */}
-              <div className="flex items-center gap-3 group/volume ml-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all">
+          <div className="pointer-events-auto hidden sm:flex items-center justify-between mt-2 sm:mt-0">
+            {/* Left side: Volume (PC only) */}
+            <div className="flex items-center w-1/3 justify-start">
+              <div className="hidden sm:flex items-center gap-3 group/volume bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all border border-white/5 shadow-inner">
                 <button onClick={toggleMute} className="text-white/80 hover:text-white transition-colors">
                   {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>
@@ -350,14 +405,29 @@ export default function MaterialPlayerModal() {
                   className="w-16 h-1 accent-emerald-500 appearance-none bg-white/20 rounded-full cursor-pointer hover:bg-white/30"
                 />
               </div>
-
-              <div className="text-xs text-white/70 font-mono tracking-wider ml-2 tabular-nums">
-                {formatTime(currentTime)} <span className="opacity-30 mx-1">/</span> {formatTime(duration)}
-              </div>
             </div>
 
-            <div className="flex items-center gap-5">
-              {/* Speed Selector */}
+            {/* Center: Playback Controls (PC Only) */}
+            <div className="flex items-center justify-center gap-6 sm:gap-8 w-1/3">
+              <button onClick={() => handleSkip(-10)} className="text-white/70 hover:text-white transition-colors" title="Back 10s (←)">
+                <RotateCcw size={22} className="w-6 h-6" />
+              </button>
+              
+              <button 
+                onClick={togglePlay} 
+                className="p-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 hover:text-emerald-300 rounded-full transition-all shadow-lg shadow-emerald-500/10"
+              >
+                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
+              </button>
+
+              <button onClick={() => handleSkip(10)} className="text-white/70 hover:text-white transition-colors" title="Forward 10s (→)">
+                <RotateCw size={22} className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Right side: Speed and MiniPlayer (PC Only) */}
+            <div className="flex items-center justify-end gap-5 w-1/3">
+              {/* Full speed selector for PC */}
               <div className="flex items-center bg-white/5 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-lg">
                 {[0.5, 1, 1.5, 2].map((s) => (
                   <button
@@ -371,8 +441,8 @@ export default function MaterialPlayerModal() {
                 ))}
               </div>
 
-              {/* Mini-player button — hidden in fullscreen */}
-              {isVideo && !isFullscreen && (
+              {/* Mini-player button */}
+              {!isFullscreen && (
                 <button onClick={togglePip} className="text-white/80 hover:text-white transition-colors" title="Mini player (I)">
                   <Monitor size={20} />
                 </button>
@@ -380,12 +450,12 @@ export default function MaterialPlayerModal() {
             </div>
           </div>
 
-          {/* Shortcut Legend Overlay */}
-          <div className="mt-5 pb-1 flex items-center justify-between text-[9px] text-white/20 font-bold uppercase tracking-[2.5px] border-t border-white/5 pt-3">
+          {/* Shortcut Legend Overlay - hidden on touch devices */}
+          <div className="hidden sm:flex mt-3 sm:mt-5 pb-1 items-center justify-between text-[9px] text-white/20 font-bold uppercase tracking-[2.5px] border-t border-white/5 pt-3">
             <div className="flex gap-6">
               <span className="flex gap-1.5"><kbd className="text-white/40 opacity-100">SPACE</kbd> Play</span>
               <span className="flex gap-1.5"><kbd className="text-white/40 opacity-100">F</kbd> Fullscreen</span>
-              {isVideo && <span className="flex gap-1.5"><kbd className="text-white/40 opacity-100">I</kbd> Mini</span>}
+              <span className="flex gap-1.5"><kbd className="text-white/40 opacity-100">I</kbd> Mini</span>
               <span className="flex gap-1.5"><kbd className="text-white/40 opacity-100">M</kbd> Mute</span>
               <span className="flex gap-1.5"><kbd className="text-white/40 opacity-100">ESC</kbd> Close</span>
             </div>

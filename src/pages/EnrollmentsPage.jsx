@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Plus, BookOpen, ChevronRight, AlertCircle, CheckCircle2, X } from 'lucide-react'
+import { Users, Plus, ChevronRight, AlertCircle, CheckCircle2, X } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useStudentSubjects, useJoinSubject } from '../hooks/useSubjects'
+import { logger } from '../utils/logger'
 
 function formatDate(instant) {
   if (!instant) return ''
@@ -23,6 +24,28 @@ export default function EnrollmentsPage() {
   const navigate = useNavigate()
   const { data: subjects = [], isLoading, isError } = useStudentSubjects()
   const joinMutation = useJoinSubject()
+
+  const [localUpdatedAts, setLocalUpdatedAts] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('subjects_updated_at') || '{}')
+    } catch (error) {
+      logger.warn('Failed to load cached subject timestamps on initial render', { error: error?.message })
+      return {}
+    }
+  })
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        setLocalUpdatedAts(JSON.parse(localStorage.getItem('subjects_updated_at') || '{}'))
+      } catch (error) {
+        // Log cache update listener failure - UI won't reflect cache updates but core functionality works
+        logger.debug('Failed to sync cached subject timestamps on update event', { error: error?.message })
+      }
+    }
+    window.addEventListener('subjects_cache_updated', handleUpdate)
+    return () => window.removeEventListener('subjects_cache_updated', handleUpdate)
+  }, [])
 
   const [showJoin, setShowJoin] = useState(false)
   const [joinCode, setJoinCode] = useState('')
@@ -47,7 +70,7 @@ export default function EnrollmentsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-6 py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -159,8 +182,14 @@ export default function EnrollmentsPage() {
                 className="group bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-5 cursor-pointer hover:border-green-300 dark:hover:border-green-800 hover:shadow-sm transition-all animate-slide-up"
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <h2 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors line-clamp-1">
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors line-clamp-1 flex items-center gap-2">
                     {subject.name}
+                    {localUpdatedAts[String(subject.id)] !== subject.updatedAt && (
+                      <span className="relative flex h-2 w-2 shrink-0" title="Updates available">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                      </span>
+                    )}
                   </h2>
                   <ChevronRight size={15} className="text-gray-300 dark:text-gray-600 group-hover:translate-x-0.5 transition-transform shrink-0 mt-0.5" />
                 </div>

@@ -81,7 +81,7 @@ export default function UnitsPage() {
     for (const u of active) {
       const topicTitles = u.topics.map(t => t.title.trim())
       for (const tt of topicTitles) {
-        if (!tt) { setError(`Unit "${u.title.trim()}" has an empty topic — fill it in or remove it.`); return }
+        if (!tt) { setError(`Unit "${u.title.trim()}" has an empty topic — Atleast one topic is required.`); return }
       }
       const topicLower = topicTitles.map(t => t.toLowerCase())
       const hasDupTopic = topicLower.some((t, i) => topicLower.indexOf(t) !== i)
@@ -104,7 +104,7 @@ export default function UnitsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-6 py-10">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         {/* Back */}
         <button
@@ -116,46 +116,31 @@ export default function UnitsPage() {
           {subject?.name ?? 'Subject'}
         </button>
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Manage Units</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               Add units and topics to organise your curriculum.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
             <button
               onClick={() => setShowParseModal(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border border-green-200 dark:border-green-800/50 hover:border-green-300 dark:hover:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/40 px-3 py-2 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border border-green-200 dark:border-green-800/50 hover:border-green-300 dark:hover:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/40 px-3 py-2 rounded-xl transition-colors whitespace-nowrap shrink-0"
             >
-              <Sparkles size={14} />
+              <Sparkles size={14} className="shrink-0" />
               {existingCount > 0 ? 'Import from PDF' : 'Get from PDF'}
             </button>
             <button
               onClick={openAddModal}
-              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors whitespace-nowrap shrink-0"
             >
-              <Plus size={15} />
+              <Plus size={15} className="shrink-0" />
               Add units
             </button>
           </div>
         </div>
 
-        {/* Banners */}
-        {error && (
-          <div className="flex items-center gap-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400 mb-4 animate-slide-up">
-            <AlertCircle size={15} className="shrink-0" />
-            {error}
-            <button onClick={() => setError('')} className="ml-auto opacity-50 hover:opacity-100"><X size={13} /></button>
-          </div>
-        )}
-        {success && (
-          <div className="flex items-center gap-2.5 bg-green-50 dark:bg-[#052e16]/60 border border-green-200 dark:border-green-900/50 rounded-xl px-4 py-3 text-sm text-green-700 dark:text-green-400 mb-4 animate-slide-up">
-            <CheckCircle2 size={15} className="shrink-0" />
-            {success}
-            <button onClick={() => setSuccess('')} className="ml-auto opacity-50 hover:opacity-100"><X size={13} /></button>
-          </div>
-        )}
 
         {/* Loading */}
         {isLoading && (
@@ -178,7 +163,7 @@ export default function UnitsPage() {
         {subject && (
           <div className="space-y-3 mb-6">
             {subject.units?.length === 0 && drafts.length === 0 && (
-              <div className="border border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl px-6 py-10 text-center bg-white dark:bg-[#1a1a1a]">
+              <div className="border border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl px-4 sm:px-6 py-8 sm:py-10 text-center bg-white dark:bg-[#1a1a1a]">
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Sparkles size={22} className="text-green-500 dark:text-green-400" />
                 </div>
@@ -224,6 +209,22 @@ export default function UnitsPage() {
                 onRemove={() => removeDraft(i)}
               />
             ))}
+
+            {/* Banners — shown near the action buttons so they're visible when editing */}
+            {error && (
+              <div className="flex items-center gap-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400 animate-slide-up">
+                <AlertCircle size={15} className="shrink-0" />
+                {error}
+                <button onClick={() => setError('')} className="ml-auto opacity-50 hover:opacity-100"><X size={13} /></button>
+              </div>
+            )}
+            {success && (
+              <div className="flex items-center gap-2.5 bg-green-50 dark:bg-[#052e16]/60 border border-green-200 dark:border-green-900/50 rounded-xl px-4 py-3 text-sm text-green-700 dark:text-green-400 animate-slide-up">
+                <CheckCircle2 size={15} className="shrink-0" />
+                {success}
+                <button onClick={() => setSuccess('')} className="ml-auto opacity-50 hover:opacity-100"><X size={13} /></button>
+              </div>
+            )}
 
             {/* Save / discard */}
             <div className="flex gap-3 pt-2">
