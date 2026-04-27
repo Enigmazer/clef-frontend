@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from 'react'
 import { useNavigate, useParams, useLocation, useBlocker } from 'react-router-dom'
-import { ChevronLeft, Plus, AlertCircle, CheckCircle2, X, Sparkles, ArrowRight } from 'lucide-react'
+import { ChevronLeft, Plus, AlertCircle, CheckCircle2, X, Sparkles, ArrowRight, ArrowUpDown } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useTeacherSubjectDetail, useBulkAddUnits } from '../hooks/useSubjects'
 import { buildDefaultUnits } from '../components/units/DefaultUnitsBuilder'
@@ -8,6 +8,7 @@ import ExistingUnitRow from '../components/units/ExistingUnitRow'
 import DraftUnitEditor from '../components/units/DraftUnitEditor'
 import HowManyModal from '../components/units/HowManyModal'
 import ParseSyllabusModal from '../components/units/ParseSyllabusModal'
+import ReorderUnitsView from '../components/units/ReorderUnitsView'
 
 export default function UnitsPage() {
   const { id } = useParams()
@@ -19,6 +20,7 @@ export default function UnitsPage() {
   const [drafts, setDrafts] = useState([])
   const [showHowMany, setShowHowMany] = useState(false)
   const [showParseModal, setShowParseModal] = useState(false)
+  const [isReordering, setIsReordering] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -104,7 +106,7 @@ export default function UnitsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         {/* Back */}
         <button
@@ -116,14 +118,27 @@ export default function UnitsPage() {
           {subject?.name ?? 'Subject'}
         </button>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Manage Units</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               Add units and topics to organise your curriculum.
             </p>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {existingCount > 0 && drafts.length === 0 && (
+              <button
+                onClick={() => setIsReordering(!isReordering)}
+                className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl transition-colors whitespace-nowrap shrink-0 border ${
+                  isReordering 
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700' 
+                    : 'bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
+                }`}
+              >
+                <ArrowUpDown size={14} className="shrink-0" />
+                {isReordering ? 'Cancel Reorder' : 'Reorder'}
+              </button>
+            )}
             <button
               onClick={() => setShowParseModal(true)}
               className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border border-green-200 dark:border-green-800/50 hover:border-green-300 dark:hover:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/40 px-3 py-2 rounded-xl transition-colors whitespace-nowrap shrink-0"
@@ -189,9 +204,20 @@ export default function UnitsPage() {
                 </div>
               </div>
             )}
-            {subject.units?.map(unit => (
-              <ExistingUnitRow key={unit.id} unit={unit} subjectId={subject.id} />
-            ))}
+            {isReordering && existingCount > 0 ? (
+              <ReorderUnitsView 
+                subject={subject} 
+                onCancel={() => setIsReordering(false)}
+                onSuccess={() => {
+                  setIsReordering(false)
+                  setSuccess('Order saved successfully.')
+                }}
+              />
+            ) : (
+              subject.units?.map(unit => (
+                <ExistingUnitRow key={unit.id} unit={unit} subjectId={subject.id} />
+              ))
+            )}
           </div>
         )}
 

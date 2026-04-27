@@ -13,6 +13,12 @@ const FOCUSABLE_SELECTOR = [
 export default function Modal({ isOpen, onClose, title, children }) {
   const modalRef = useRef(null)
 
+  const onCloseRef = useRef(onClose)
+  
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
   useEffect(() => {
     if (!isOpen) return undefined
 
@@ -31,7 +37,7 @@ export default function Modal({ isOpen, onClose, title, children }) {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
 
@@ -60,11 +66,11 @@ export default function Modal({ isOpen, onClose, title, children }) {
 
     return () => {
       modalElement.removeEventListener('keydown', handleKeyDown)
-      if (previousActiveElement instanceof HTMLElement) {
+      if (previousActiveElement instanceof HTMLElement && document.body.contains(previousActiveElement)) {
         previousActiveElement.focus()
       }
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   if (!isOpen) return null
 

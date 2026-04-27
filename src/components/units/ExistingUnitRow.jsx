@@ -109,7 +109,7 @@ export default function ExistingUnitRow({ subjectId, unit }) {
       promises.push(updateUnit({
         unitId: unit.id,
         data: {
-          title: editTitle.trim(),
+          title: editTitle.trim() !== unit.title.trim() ? editTitle.trim() : null,
           topics: cleanNewTopics.map(t => ({ title: t.title.trim() }))
         }
       }))

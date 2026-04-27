@@ -197,7 +197,7 @@ export default function SubjectDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         <button
           onClick={() => navigate('/subjects')}
@@ -530,68 +530,70 @@ export default function SubjectDetailPage() {
               </div>
             ) : (
               <div className="flex flex-col">
-                <SettingRow
-                  title="Subject Details"
-                  description="Rename the subject or update its description."
-                  action={<button onClick={() => { setShowSettings(false); openEdit() }} className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">Edit details</button>}
-                />
+                <div className="flex flex-col">
+                  <SettingRow
+                    title="Subject Details"
+                    description="Rename the subject or update its description."
+                    action={<button onClick={() => { setShowSettings(false); openEdit() }} className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">Edit details</button>}
+                  />
 
-                <SettingRow
-                  title="Join Code"
-                  description="Share this 6-character code with your students so they can enroll in this subject."
-                  action={<JoinCodePill code={subject?.joinCode} />}
-                />
+                  <SettingRow
+                    title="Join Code"
+                    description="Share this 6-character code with your students so they can enroll in this subject."
+                    action={<JoinCodePill code={subject?.joinCode} />}
+                  />
 
-                <SettingRow
-                  title="Enrollment"
-                  description={subject?.locked ? 'Locked — new students cannot join.' : 'Open — students can join with the join code.'}
-                  action={
-                    <button
-                      onClick={handleLock}
-                      disabled={lockMutation.isPending}
-                      className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {lockMutation.isPending
-                        ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                        : subject?.locked ? <LockOpen size={12} /> : <Lock size={12} />}
-                      {subject?.locked ? 'Unlock' : 'Lock'}
-                    </button>
-                  }
-                />
+                  <SettingRow
+                    title="Enrollment"
+                    description={subject?.locked ? 'Locked — new students cannot join.' : 'Open — students can join with the join code.'}
+                    action={
+                      <button
+                        onClick={handleLock}
+                        disabled={lockMutation.isPending}
+                        className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {lockMutation.isPending
+                          ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                          : subject?.locked ? <LockOpen size={12} /> : <Lock size={12} />}
+                        {subject?.locked ? 'Unlock' : 'Lock'}
+                      </button>
+                    }
+                  />
 
-                <SettingRow
-                  title="Syllabus"
-                  description="Upload a syllabus PDF file (Max 2MB)."
-                  action={
-                    <div className="flex items-center justify-end gap-2">
-                      {subject?.isSyllabusPdfAvailable ? (
-                        <>
-                          <button
-                            onClick={handleViewSyllabus}
-                            disabled={isFetchingSyllabus}
-                            className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium py-1 disabled:opacity-50"
-                          >
-                            {isFetchingSyllabus ? 'Opening...' : 'View Syllabus PDF'}
-                          </button>
-                          <button onClick={handleDeleteSyllabus} disabled={deleteSyllabusMutation.isPending} className="text-red-500 hover:text-red-700 p-1 rounded-md transition-colors disabled:opacity-50" title="Delete Syllabus">
-                            <Trash2 size={13} />
-                          </button>
-                        </>
-                      ) : (
-                        <label className="cursor-pointer text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">
-                          {uploadSyllabusMutation.isPending ? 'Uploading...' : '+ Upload PDF'}
-                          <input
-                            type="file"
-                            accept="application/pdf"
-                            className="hidden"
-                            onChange={handleUploadSyllabus}
-                            disabled={uploadSyllabusMutation.isPending}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  }
-                />
+                  <SettingRow
+                    title="Syllabus"
+                    description="Upload a syllabus PDF file (Max 2MB)."
+                    action={
+                      <div className="flex items-center justify-end gap-2">
+                        {subject?.isSyllabusPdfAvailable ? (
+                          <>
+                            <button
+                              onClick={handleViewSyllabus}
+                              disabled={isFetchingSyllabus}
+                              className="text-green-600 dark:text-green-400 hover:underline truncate max-w-[120px] text-xs font-medium py-1 disabled:opacity-50"
+                            >
+                              {isFetchingSyllabus ? 'Opening...' : 'View Syllabus PDF'}
+                            </button>
+                            <button onClick={handleDeleteSyllabus} disabled={deleteSyllabusMutation.isPending} className="text-red-500 hover:text-red-700 p-1 rounded-md transition-colors disabled:opacity-50" title="Delete Syllabus">
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        ) : (
+                          <label className="cursor-pointer text-sm text-green-600 dark:text-green-400 hover:text-green-700 font-medium transition-colors">
+                            {uploadSyllabusMutation.isPending ? 'Uploading...' : '+ Upload PDF'}
+                            <input
+                              type="file"
+                              accept="application/pdf"
+                              className="hidden"
+                              onChange={handleUploadSyllabus}
+                              disabled={uploadSyllabusMutation.isPending}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    }
+                  />
+                </div>
 
                 <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-100 dark:border-[#2a2a2a] mt-2">
                   <button

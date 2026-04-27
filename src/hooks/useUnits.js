@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { updateUnit, deleteUnit } from '../api/units'
+import { updateUnit, deleteUnit, reorderUnits } from '../api/units'
 
 export function useUpdateUnit(subjectId) {
   const qc = useQueryClient()
@@ -13,6 +13,14 @@ export function useDeleteUnit(subjectId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (unitId) => deleteUnit(subjectId, unitId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
+  })
+}
+
+export function useReorderUnits(subjectId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data) => reorderUnits(subjectId, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
   })
 }
