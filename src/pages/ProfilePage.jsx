@@ -9,6 +9,7 @@ import PhoneSection from '../components/profile/PhoneSection'
 import DashboardVisibilitySection from '../components/profile/DashboardVisibilitySection'
 import SecuritySection from '../components/profile/SecuritySection'
 import SessionSection from '../components/profile/SessionSection'
+import PrivacySection from '../components/profile/PrivacySection'
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -75,70 +76,114 @@ export default function ProfilePage() {
     }
   }
 
+  const [activeTab, setActiveTab] = useState('profile')
+
+  const tabs = [
+    { id: 'profile', label: 'Profile' },
+    { id: 'preferences', label: 'Preferences' },
+    { id: 'security', label: 'Security' },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
       <Navbar />
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-5">
-
-        {/* ── Profile header card ── */}
-        <Card>
-          {avatarError && <StatusBanner type="error" message={avatarError} onClose={() => setAvatarError('')} />}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-            <div className="relative isolate shrink-0">
-              <Avatar user={user} size={80} />
-              {avatarUploading && (
-                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center z-10 transition-opacity">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
-                    {user?.fullName ?? '—'}
-                  </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                    {user?.email}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Member since {formatDate(user?.createdAt)}
-                  </p>
-                </div>
-                {user?.role === 'ADMIN' && (
-                  <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
-                    Admin
-                  </span>
-                )}
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/jpeg, image/png" onChange={handleAvatarSelect} />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={avatarUploading}
-                  className="text-xs font-medium px-3 py-1.5 bg-gray-100 dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-lg transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Sidebar */}
+          <aside className="w-full md:w-64 shrink-0">
+            <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0 scrollbar-hide">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`text-left px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1e1e1e] hover:text-gray-900 dark:hover:text-white'
+                  }`}
                 >
-                  Change Avatar
+                  {tab.label}
                 </button>
-                {user?.avatarUrl && (
-                  <button 
-                    onClick={handleDeleteAvatar}
-                    disabled={avatarUploading}
-                    className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 transition-colors"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </Card>
+              ))}
+            </nav>
+          </aside>
 
-        {/* ── Remaining sections ── */}
-        <PhoneSection />
-        <DashboardVisibilitySection user={user} />
-        <SecuritySection user={user} />
-        <SessionSection />
+          {/* Main Content */}
+          <div className="flex-1 min-w-0 space-y-5">
+            {activeTab === 'profile' && (
+              <>
+                {/* ── Profile header card ── */}
+                <Card>
+                  {avatarError && <StatusBanner type="error" message={avatarError} onClose={() => setAvatarError('')} />}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                    <div className="relative isolate shrink-0">
+                      <Avatar user={user} size={80} />
+                      {avatarUploading && (
+                        <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center z-10 transition-opacity">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                            {user?.fullName ?? '—'}
+                          </h1>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                            {user?.email}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            Member since {formatDate(user?.createdAt)}
+                          </p>
+                        </div>
+                        {user?.role === 'ADMIN' && (
+                          <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/jpeg, image/png" onChange={handleAvatarSelect} />
+                        <button 
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={avatarUploading}
+                          className="text-xs font-medium px-3 py-1.5 bg-gray-100 dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-lg transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                        >
+                          Change Avatar
+                        </button>
+                        {user?.avatarUrl && (
+                          <button 
+                            onClick={handleDeleteAvatar}
+                            disabled={avatarUploading}
+                            className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+                <PhoneSection onNavigateToSecurity={() => setActiveTab('security')} />
+              </>
+            )}
+
+            {activeTab === 'preferences' && (
+              <>
+                <PrivacySection user={user} />
+                <DashboardVisibilitySection user={user} />
+              </>
+            )}
+
+            {activeTab === 'security' && (
+              <>
+                <SecuritySection user={user} />
+                <SessionSection />
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Avatar Preview Modal */}

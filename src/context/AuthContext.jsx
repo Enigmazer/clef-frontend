@@ -13,8 +13,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     // Handle OAuth2 success redirect: backend sends /dashboard#at=<accessToken>
     // Fragment is browser-only — never sent to servers, not visible in logs
+    //
+    // IMPORTANT: skip extraction on /reset-password — that page owns the token
+    // and uses it as a one-shot Bearer credential, not a session token.
     const hash = window.location.hash
-    if (hash.startsWith('#at=')) {
+    const isResetPassword = window.location.pathname === '/reset-password'
+    if (hash.startsWith('#at=') && !isResetPassword) {
       tokenStore.set(hash.slice(4))
       // Remove the fragment from the URL immediately — token must not sit in the address bar
       window.history.replaceState(null, '', window.location.pathname + window.location.search)

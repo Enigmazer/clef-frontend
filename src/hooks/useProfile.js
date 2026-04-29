@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMe, togglePhoneVisibility, toggleStudentSectionVisibility, toggleTeacherSectionVisibility, uploadAvatar, deleteAvatar } from '../api/users'
 import { getPhones, sendOtp as sendPhoneOtp, verifyOtp as verifyPhoneOtp, deletePhone, setPrimaryPhone } from '../api/phone'
-import { password, send2FAOtp, enable2FA, disable2FA } from '../api/auth'
+import { setPassword, updatePassword, send2FAOtp, enable2FA, disable2FA } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { useUploads } from '../context/UploadContext'
 
@@ -79,7 +79,12 @@ export function useProfileMutations() {
     }),
 
     setPassword: useMutation({
-      mutationFn: password,
+      mutationFn: ({ password }) => setPassword(password),
+      onSuccess: invalidateUser,
+    }),
+
+    updatePassword: useMutation({
+      mutationFn: ({ currentPassword, newPassword }) => updatePassword(currentPassword, newPassword),
       onSuccess: invalidateUser,
     }),
 

@@ -160,6 +160,15 @@ export default function LoginPage() {
               >
                 {loading ? 'Signing in…' : 'Sign in'}
               </div>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = '/api/auth/password/reset/oauth2/init' }}
+                  className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -631,25 +631,19 @@ export default function SubjectDetailPage() {
         )}
 
         {/* Delete confirm modal */}
-        <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete subject">
-          <div className="space-y-4 pt-1">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title="Delete subject"
+          message={
+            <>
               This will permanently delete <strong className="text-gray-900 dark:text-white">{subject?.name}</strong> and all its units and topics. This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] rounded-xl transition-colors font-medium">
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="flex-1 px-4 py-2.5 text-sm text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </Modal>
+            </>
+          }
+          confirmText="Delete"
+          loading={deleteMutation.isPending}
+        />
 
         {/* Syllabus delete confirm modal */}
         <ConfirmModal

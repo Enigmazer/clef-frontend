@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Phone, Plus, Trash2, AlertTriangle } from 'lucide-react'
-import Modal from '../../components/Modal'
+import ConfirmModal from '../../components/ConfirmModal'
 import { useAuth } from '../../context/AuthContext'
 import { usePhonesQuery, useProfileMutations } from '../../hooks/useProfile'
 import { Card, SectionTitle, StatusBanner, Toggle } from './ProfileUI'
@@ -40,7 +40,7 @@ const COUNTRIES = [
   { code: 'TH', dial: '+66', name: 'Thailand', flag: '🇹🇭' },
 ]
 
-export default function PhoneSection() {
+export default function PhoneSection({ onNavigateToSecurity }) {
   const { user } = useAuth()
   const { data: phonesData, isLoading: loading } = usePhonesQuery()
   const phones = Array.isArray(phonesData) ? phonesData : []
@@ -214,25 +214,7 @@ export default function PhoneSection() {
         <StatusBanner type="error" message={wizard.error} onClose={() => setW({ error: '' })} />
         <StatusBanner type="success" message={wizard.success} onClose={() => setW({ success: '' })} />
 
-        {phones.length > 0 && (
-          <div className="mb-2">
-            <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-4" />
-            <Toggle
-              checked={user?.showPhoneToStudents ?? false}
-              onChange={async () => {
-                clearMessages()
-                try {
-                  await mutations.toggleVisibility.mutateAsync()
-                } catch (err) {
-                  setW({ error: getErrorMessage(err, 'Failed to update visibility.') })
-                }
-              }}
-              label="Show phone number to students"
-              description="Students enrolled in your subjects will be able to see your phone number(s)"
-            />
-            <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-4" />
-          </div>
-        )}
+
 
         {wizard.step === 'idle' && canAdd && (
           <button
@@ -334,34 +316,18 @@ export default function PhoneSection() {
       </div>
 
       {/* 2FA Guard Modal */}
-      <Modal isOpen={wizard.tfaGuardModal} onClose={() => setW({ tfaGuardModal: false })}>
-        <div className="flex flex-col items-center text-center pt-2 pb-1">
-          <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
-            <AlertTriangle className="text-amber-600 dark:text-amber-500" size={24} />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Two-Factor Authentication is Active</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 px-2">
-            Your primary number is used for two-factor authentication. Disable 2FA first before making changes to your primary number.
-          </p>
-          <div className="w-full space-y-2.5 flex flex-col items-stretch">
-            <button
-              onClick={() => {
-                setW({ tfaGuardModal: false })
-                document.getElementById('security-section')?.scrollIntoView({ behavior: 'smooth' })
-              }}
-              className="w-full bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-3 rounded-xl transition-colors"
-            >
-              Go to Security Settings
-            </button>
-            <button
-              onClick={() => setW({ tfaGuardModal: false })}
-              className="w-full bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] text-gray-700 dark:text-gray-300 text-sm font-medium py-3 rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmModal
+        isOpen={wizard.tfaGuardModal}
+        onClose={() => setW({ tfaGuardModal: false })}
+        onConfirm={() => {
+          setW({ tfaGuardModal: false })
+          if (onNavigateToSecurity) onNavigateToSecurity()
+        }}
+        title="Two-Factor Authentication is Active"
+        message="Your primary number is used for two-factor authentication. Disable 2FA first before making changes to your primary number."
+        confirmText="Go to Security Settings"
+        variant="amber"
+      />
     </Card>
   )
 }

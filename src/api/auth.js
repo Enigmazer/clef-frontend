@@ -12,8 +12,11 @@ export const logoutAll = () =>
 export const refresh = () =>
   api.post('/auth/refresh')
 
-export const password = (newPassword) =>
-  api.post('/auth/password', { newPassword })
+export const setPassword = (password) =>
+  api.post('/auth/password/set', { password })
+
+export const updatePassword = (currentPassword, newPassword) =>
+  api.patch('/auth/password/update', { currentPassword, newPassword })
 
 export const send2FAOtp = () =>
   api.post('/auth/2fa/send-otp')

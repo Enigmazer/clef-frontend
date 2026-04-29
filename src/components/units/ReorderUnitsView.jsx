@@ -211,12 +211,14 @@ export default function ReorderUnitsView({ subject, onCancel, onSuccess }) {
         unitChanged = true
       }
       
+      // tIndex is the topic's position in the full (post-drag) topic list.
+      // orderIndex is 1-based to match how the backend initialises topic order.
       newUnit.topics.forEach((newTopic, tIndex) => {
         const origTopicIndex = origUnit.topics.findIndex(t => t.id === newTopic.id)
         if (origTopicIndex !== tIndex) {
           changedTopics.push({
             id: newTopic.id,
-            orderIndex: tIndex
+            orderIndex: tIndex + 1
           })
         }
       })

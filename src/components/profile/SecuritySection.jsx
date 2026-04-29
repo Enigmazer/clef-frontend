@@ -13,7 +13,13 @@ export default function SecuritySection({ user }) {
   const hasPassword = user?.hasPassword ?? false
   const is2faEnabled = user?.twoFactorEnabled ?? false
 
-  const [pwValue, setPwValue] = useState('')
+  const [setPwValue, setSetPwValue] = useState('')
+  const [setPwConfirm, setSetPwConfirm] = useState('')
+  
+  const [currentPwValue, setCurrentPwValue] = useState('')
+  const [newPwValue, setNewPwValue] = useState('')
+  const [newPwConfirm, setNewPwConfirm] = useState('')
+
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,23 +42,49 @@ export default function SecuritySection({ user }) {
     setTfaCode('')
   }
 
-  const handlePasswordSubmit = async () => {
-    if (pwValue.length < 8) {
-      setError('Password must be at least 8 characters.')
+  const handleSetPasswordSubmit = async () => {
+    if (setPwValue !== setPwConfirm) {
+      setError('Passwords do not match.')
       return
     }
-    if (pwValue.length > 64) {
-      setError('Password must be at most 64 characters.')
+    if (setPwValue.length < 8 || setPwValue.length > 64) {
+      setError('Password must be between 8 and 64 characters.')
       return
     }
     setError(''); setSuccess('')
     setLoading(true)
     try {
-      await mutations.setPassword.mutateAsync(pwValue)
-      setSuccess(hasPassword ? 'Password updated.' : 'Password set. You can now sign in with email.')
-      setPwValue('')
+      await mutations.setPassword.mutateAsync({ password: setPwValue })
+      setSuccess('Password set. You can now sign in with email.')
+      setSetPwValue(''); setSetPwConfirm('')
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to set password. Please try again.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdatePasswordSubmit = async () => {
+    if (!currentPwValue) {
+      setError('Current password is required.')
+      return
+    }
+    if (newPwValue !== newPwConfirm) {
+      setError('New passwords do not match.')
+      return
+    }
+    if (newPwValue.length < 8 || newPwValue.length > 64) {
+      setError('New password must be between 8 and 64 characters.')
+      return
+    }
+    setError(''); setSuccess('')
+    setLoading(true)
+    try {
+      await mutations.updatePassword.mutateAsync({ currentPassword: currentPwValue, newPassword: newPwValue })
+      setSuccess('Password updated successfully.')
+      setCurrentPwValue(''); setNewPwValue(''); setNewPwConfirm('')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to update password. Please check your current password and try again.'))
     } finally {
       setLoading(false)
     }
@@ -106,38 +138,96 @@ export default function SecuritySection({ user }) {
       )}
 
       <div className="space-y-3">
-        <div className="relative">
-          <input
-            type={showPw ? 'text' : 'password'}
-            autoComplete="new-password"
-            placeholder={hasPassword ? 'New password' : 'Set a password'}
-            value={pwValue}
-            onChange={(e) => setPwValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-            className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPw((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
-        </div>
-        {pwValue.length > 64 && (
-          <p className="text-xs text-red-500 dark:text-red-400">Password must be at most 64 characters.</p>
-        )}
-
         <StatusBanner type="error" message={error} onClose={() => setError('')} />
         <StatusBanner type="success" message={success} onClose={() => setSuccess('')} />
 
-        <button
-          onClick={handlePasswordSubmit}
-          disabled={loading}
-          className="w-full bg-green-500 text-white text-sm font-medium rounded-xl px-4 py-2.5 hover:bg-green-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Saving…' : hasPassword ? 'Update password' : 'Set password'}
-        </button>
+        {!hasPassword ? (
+          <>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder="Set a password"
+                value={setPwValue}
+                onChange={(e) => setSetPwValue(e.target.value)}
+                className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder="Confirm password"
+                value={setPwConfirm}
+                onChange={(e) => setSetPwConfirm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSetPasswordSubmit()}
+                className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              onClick={handleSetPasswordSubmit}
+              disabled={loading || !setPwValue || !setPwConfirm}
+              className="w-full bg-green-500 text-white text-sm font-medium rounded-xl px-4 py-2.5 hover:bg-green-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+            >
+              {loading ? 'Saving…' : 'Set password'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder="Current password"
+                value={currentPwValue}
+                onChange={(e) => setCurrentPwValue(e.target.value)}
+                className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder="New password"
+                value={newPwValue}
+                onChange={(e) => setNewPwValue(e.target.value)}
+                className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder="Confirm new password"
+                value={newPwConfirm}
+                onChange={(e) => setNewPwConfirm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleUpdatePasswordSubmit()}
+                className="w-full border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3.5 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              onClick={handleUpdatePasswordSubmit}
+              disabled={loading || !currentPwValue || !newPwValue || !newPwConfirm}
+              className="w-full bg-green-500 text-white text-sm font-medium rounded-xl px-4 py-2.5 hover:bg-green-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+            >
+              {loading ? 'Saving…' : 'Update password'}
+            </button>
+          </>
+        )}
 
         <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-5" />
 
