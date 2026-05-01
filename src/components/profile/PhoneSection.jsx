@@ -278,6 +278,9 @@ export default function PhoneSection({ onNavigateToSecurity }) {
             <p className="text-xs text-gray-500 dark:text-gray-400">
               A 6-digit code was sent to <span className="font-medium text-gray-700 dark:text-gray-300">{wizard.sentPhone}</span>
             </p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2">
+              SMS OTP is simulated due to Twilio free tier limitations — enter the last 6 digits of your phone number to verify.
+            </p>
             <input
               type="text"
               inputMode="numeric"
