@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import { login } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { getMe } from '../api/users'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle'
 
 const API_URL = import.meta.env.VITE_API_URL
@@ -16,18 +16,28 @@ export default function LoginPage() {
   const [showEmail, setShowEmail] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get('error') === 'oauth2_failed' ? 'OAuth sign-in failed. Please try again.' : ''
-  })
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [failCount, setFailCount] = useState(0)
+  const urlError = resolveUrlError(new URLSearchParams(window.location.search).get('error'))
+  const [resetSuccess, setResetSuccess] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('reset') === 'success'
+  })
+  const resetBannerTimer = useRef(null)
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       navigate('/dashboard', { replace: true })
     }
   }, [isLoading, isAuthenticated, navigate])
+
+  useEffect(() => {
+    if (!resetSuccess) return
+    window.history.replaceState(null, '', window.location.pathname)
+    resetBannerTimer.current = setTimeout(() => setResetSuccess(false), 4000)
+    return () => clearTimeout(resetBannerTimer.current)
+  }, [resetSuccess])
 
   const handleOAuth = (provider) => {
     window.location.href = `${API_URL}/oauth2/authorization/${provider}`
@@ -75,6 +85,15 @@ export default function LoginPage() {
       {/* card */}
       <div className="flex-1 flex items-center justify-center px-4 pb-12">
         <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] p-8 w-full max-w-sm shadow-sm">
+
+          {/* Reset success banner */}
+          {resetSuccess && (
+            <div className="flex items-start gap-2.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/60 rounded-lg px-3 py-2.5 mb-5 animate-fade-in">
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+              <span>Password reset successfully. Sign in with your new password.</span>
+            </div>
+          )}
+
           <div className="flex justify-center mb-3">
             <Logo size="md" />
           </div>
@@ -85,6 +104,14 @@ export default function LoginPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">
             Sign in or create an account
           </p>
+
+          {/* URL-sourced error banner*/}
+          {urlError && (
+            <div className="flex items-start gap-2.5 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-lg px-3 py-2.5 mb-5 animate-fade-in">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <span>{urlError}</span>
+            </div>
+          )}
 
           {/* OAuth buttons */}
           <div className="flex flex-col gap-3">
@@ -163,7 +190,7 @@ export default function LoginPage() {
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={() => { window.location.href = '/api/auth/password/reset/oauth2/init' }}
+                  onClick={() => navigate('/forgot-password')}
                   className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 >
                   Forgot password?
@@ -175,6 +202,35 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+// Maps URL ?error= codes sent by the backend to user-facing messages.
+// The FailureHandler uses exception.getMessage() as the error code, and every
+// OAuth2AuthenticationException in CustomOAuth2UserService sets message = error code string.
+function resolveUrlError(code) {
+  switch (code) {
+    case 'oauth2_failed':
+      return 'Sign-in failed. Please try again.'
+    case 'password_reset_unavailable':
+      return 'Password reset isn\'t available for this account.'
+    case 'provider_mismatch':
+      return 'Password reset failed. Please try a different sign-in method or contact support.'
+    case 'account_unavailable':
+      return 'No account found. Please sign up first.'
+    case 'account_disabled':
+      return 'Your account has been disabled. Please contact support.'
+    case 'unverified_email':
+      return 'Your Google account email is not verified. Please verify it with Google and try again.'
+    case 'missing_google_email':
+      return 'We couldn\'t retrieve your email from Google. Please ensure your Google account has an email address.'
+    case 'missing_github_email':
+      return 'We couldn\'t retrieve a verified email from GitHub. Please add and verify a primary email in your GitHub settings.'
+    case 'missing_provider_id':
+    case 'unsupported_provider':
+      return 'This sign-in method is not supported. Please use Google or GitHub.'
+    default:
+      return ''
+  }
 }
 
 function GoogleIcon() {

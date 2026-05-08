@@ -17,6 +17,7 @@ import {
   TermsPage,
   SupportPage,
   ResetPasswordPage,
+  ForgotPasswordPage,
 } from './lazyPages'
 
 import DashboardPage from '../pages/DashboardPage'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: withSuspense(LandingPage) },
       { path: '/login', element: withSuspense(LoginPage) },
+      { path: '/forgot-password', element: withSuspense(ForgotPasswordPage) },
       { path: '/2fa-verify', element: withSuspense(TwoFAVerifyPage) },
       { path: '/reset-password', element: withSuspense(ResetPasswordPage) },
       { path: '/privacy', element: withSuspense(PrivacyPage) },

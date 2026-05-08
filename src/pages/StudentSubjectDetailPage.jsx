@@ -320,7 +320,7 @@ export default function StudentSubjectDetailPage() {
                   <ChevronLeft size={16} className="text-gray-400 -scale-x-100 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                 </button>
               ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-1">No syllabus has been uploaded for this subject yet.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-1">No syllabus pdf has been uploaded for this subject yet.</p>
               )}
             </div>
 
