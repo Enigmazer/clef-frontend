@@ -11,11 +11,57 @@ export function useUpdateTopics(subjectId) {
 }
 
 export function useToggleTopicComplete(subjectId) {
-    const qc = useQueryClient()
-    return useMutation({
-      mutationFn: ({ unitId, topicId }) => toggleTopicComplete(subjectId, unitId, topicId),
-      onSuccess: () => qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] }),
-    })
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ unitId, topicId }) => toggleTopicComplete(subjectId, unitId, topicId),
+
+    // ── Optimistic update ────────────────────────────────────────────────────
+    onMutate: async ({ unitId, topicId }) => {
+      // Cancel any in-flight refetches so they don't overwrite our optimistic data
+      await qc.cancelQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
+
+      // Snapshot previous data so we can rollback on error
+      const previousData = qc.getQueryData(['subjects', subjectId, 'teacher'])
+
+      // Immediately flip completedAt in the cache
+      qc.setQueryData(['subjects', subjectId, 'teacher'], (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          units: old.units.map((unit) => {
+            if (unit.id !== unitId) return unit
+            return {
+              ...unit,
+              topics: unit.topics.map((topic) => {
+                if (topic.id !== topicId) return topic
+                // Toggle: if currently done → clear it; if not done → set a timestamp now
+                return {
+                  ...topic,
+                  completedAt: topic.completedAt ? null : new Date().toISOString(),
+                }
+              }),
+            }
+          }),
+        }
+      })
+
+      // Return context for potential rollback
+      return { previousData }
+    },
+
+    // ── Rollback on error ────────────────────────────────────────────────────
+    onError: (_err, _vars, context) => {
+      if (context?.previousData !== undefined) {
+        qc.setQueryData(['subjects', subjectId, 'teacher'], context.previousData)
+      }
+    },
+
+    // ── Always re-sync with the server after mutation settles ────────────────
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
+    },
+  })
 }
 
 export function useDeleteTopics(subjectId) {

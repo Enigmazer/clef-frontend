@@ -350,8 +350,37 @@ export function useSetCurrentTopic(subjectId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ topicId, unitId }) => setCurrentTopic(subjectId, topicId, unitId),
+
+    onMutate: async ({ topicId, unitId }) => {
+      await qc.cancelQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
+      const previousData = qc.getQueryData(['subjects', subjectId, 'teacher'])
+
+      qc.setQueryData(['subjects', subjectId, 'teacher'], (old) => {
+        if (!old) return old
+        // Find the selected topic in the cached units to build the exact shape the UI reads
+        const unit = old.units?.find((u) => u.id === unitId)
+        const topic = unit?.topics?.find((t) => t.id === topicId)
+        if (!unit || !topic) return old
+        return {
+          ...old,
+          currentTopic: { ...topic, unit: { id: unit.id, title: unit.title } },
+        }
+      })
+
+      return { previousData }
+    },
+
+    onError: (_err, _vars, context) => {
+      if (context?.previousData !== undefined) {
+        qc.setQueryData(['subjects', subjectId, 'teacher'], context.previousData)
+      }
+    },
+
     onSuccess: (data) => {
       updateSubjectCachePartial(subjectId, data)
+    },
+
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
     },
   })
@@ -361,8 +390,36 @@ export function useSetNextTopic(subjectId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ topicId, unitId }) => setNextTopic(subjectId, topicId, unitId),
+
+    onMutate: async ({ topicId, unitId }) => {
+      await qc.cancelQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
+      const previousData = qc.getQueryData(['subjects', subjectId, 'teacher'])
+
+      qc.setQueryData(['subjects', subjectId, 'teacher'], (old) => {
+        if (!old) return old
+        const unit = old.units?.find((u) => u.id === unitId)
+        const topic = unit?.topics?.find((t) => t.id === topicId)
+        if (!unit || !topic) return old
+        return {
+          ...old,
+          nextTopic: { ...topic, unit: { id: unit.id, title: unit.title } },
+        }
+      })
+
+      return { previousData }
+    },
+
+    onError: (_err, _vars, context) => {
+      if (context?.previousData !== undefined) {
+        qc.setQueryData(['subjects', subjectId, 'teacher'], context.previousData)
+      }
+    },
+
     onSuccess: (data) => {
       updateSubjectCachePartial(subjectId, data)
+    },
+
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['subjects', subjectId, 'teacher'] })
     },
   })
